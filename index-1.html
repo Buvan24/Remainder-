@@ -1,0 +1,2237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Remainder — Your life. Remembered.</title>
+<meta name="description" content="Remainder is a private, local-first second brain for the people, memories, and responsibilities that matter." />
+<meta name="theme-color" content="#2F6F62" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Remainder" />
+<!--
+  PWA NOTE (spec §45): a fully installable, offline-capable PWA normally needs
+  manifest.json + a Service Worker as separate files. Since the requirement
+  here is a single self-contained index.html, those are intentionally not
+  faked. The app is structured (see NOTIFICATIONS + Future Notification
+  Architecture below) so a manifest.json and sw.js can be dropped in later
+  without touching this file's data or rendering logic.
+-->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%232F6F62%22/><text x=%2250%22 y=%2266%22 font-size=%2258%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Georgia,serif%22>R</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================= TOKENS ============================= */
+:root{
+  --radius-s:10px; --radius-m:16px; --radius-l:22px; --radius-xl:28px;
+  --font-display:'Fraunces', Georgia, serif;
+  --font-body:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-h: 64px;
+}
+:root[data-theme-resolved="light"]{
+  --bg:#F7F7F3;
+  --bg-elevated:#FDFDFB;
+  --surface:#FFFFFF;
+  --surface-2:#EFF0EA;
+  --text:#20241F;
+  --text-muted:#6C766D;
+  --text-faint:#98A196;
+  --border:#E6E6DF;
+  --border-strong:#D5D6CC;
+  --accent:#2F6F62;
+  --accent-strong:#245349;
+  --accent-soft:#E2EEE9;
+  --danger:#B24A34;
+  --danger-soft:#F6E4DE;
+  --warning:#9A6B12;
+  --warning-soft:#F5EAD4;
+  --success:#2F6F62;
+  --shadow-s: 0 1px 2px rgba(24,28,22,0.05);
+  --shadow-m: 0 6px 20px rgba(24,28,22,0.08);
+  --shadow-l: 0 16px 48px rgba(24,28,22,0.16);
+  --scrim: rgba(20,22,18,0.42);
+}
+:root[data-theme-resolved="dark"]{
+  --bg:#14181A;
+  --bg-elevated:#181C1E;
+  --surface:#1D2225;
+  --surface-2:#242A2D;
+  --text:#EEF1EE;
+  --text-muted:#9AA6A0;
+  --text-faint:#69746E;
+  --border:#2A3134;
+  --border-strong:#394245;
+  --accent:#5FB79C;
+  --accent-strong:#7ECBB2;
+  --accent-soft:#1E2E29;
+  --danger:#E2896E;
+  --danger-soft:#33241F;
+  --warning:#E4C067;
+  --warning-soft:#332C1A;
+  --success:#5FB79C;
+  --shadow-s: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-m: 0 6px 20px rgba(0,0,0,0.35);
+  --shadow-l: 0 20px 56px rgba(0,0,0,0.5);
+  --scrim: rgba(0,0,0,0.55);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg); color:var(--text); font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased; overscroll-behavior-y:none;
+  min-height:100vh; min-height:100dvh;
+}
+button, input, textarea, select{ font-family:inherit; color:inherit; }
+h1,h2,h3,h4{ font-family:var(--font-display); margin:0; font-weight:600; letter-spacing:-0.01em; }
+p{margin:0;}
+a{color:inherit;}
+::selection{ background:var(--accent-soft); }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:0.001ms !important; transition-duration:0.001ms !important; }
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible{
+  outline:2px solid var(--accent); outline-offset:2px; border-radius:6px;
+}
+
+/* ============================= LAYOUT ============================= */
+#app{ max-width:560px; margin:0 auto; min-height:100vh; min-height:100dvh; position:relative; padding-bottom:calc(var(--nav-h) + 28px + var(--safe-bottom)); }
+
+.topbar{
+  position:sticky; top:0; z-index:20; background:var(--bg);
+  padding:calc(18px + var(--safe-top)) 20px 10px;
+}
+.topbar-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.topbar h1{ font-size:22px; }
+.icon-btn{
+  width:40px; height:40px; border-radius:50%; border:1px solid var(--border);
+  background:var(--surface); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:transform .15s ease, background .15s ease; color:var(--text);
+}
+.icon-btn:active{ transform:scale(0.94); }
+.icon-btn svg{ width:19px; height:19px; }
+
+main{ padding:4px 20px 8px; }
+
+.section-title{
+  font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text-muted); margin:22px 2px 10px;
+}
+.section-title:first-child{ margin-top:4px; }
+
+/* ============================= CARDS ============================= */
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-l);
+  padding:16px; box-shadow:var(--shadow-s); margin-bottom:12px;
+}
+.card-tap{ cursor:pointer; transition:transform .15s ease, box-shadow .15s ease; }
+.card-tap:active{ transform:scale(0.985); }
+
+.list-item{
+  display:flex; align-items:flex-start; gap:12px; padding:13px 4px;
+  border-bottom:1px solid var(--border); cursor:pointer;
+}
+.list-item:last-child{ border-bottom:none; }
+.list-item:active{ background:var(--surface-2); border-radius:12px; }
+
+.check-circle{
+  width:22px; height:22px; border-radius:50%; border:2px solid var(--border-strong);
+  flex:0 0 auto; margin-top:1px; display:flex; align-items:center; justify-content:center;
+  transition:all .15s ease; background:transparent;
+}
+.check-circle.done{ background:var(--accent); border-color:var(--accent); }
+.check-circle svg{ width:12px; height:12px; opacity:0; transition:opacity .1s ease; }
+.check-circle.done svg{ opacity:1; }
+
+.item-title{ font-size:15px; font-weight:600; line-height:1.35; }
+.item-sub{ font-size:13px; color:var(--text-muted); margin-top:3px; line-height:1.4; }
+.item-meta{ font-size:12px; color:var(--text-faint); margin-top:4px; }
+
+.row{ display:flex; align-items:center; gap:10px; }
+.row-between{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.spacer{ flex:1; }
+
+/* badges */
+.badge{
+  display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700;
+  padding:3px 8px; border-radius:20px; letter-spacing:.02em; white-space:nowrap;
+}
+.badge-critical{ background:var(--danger-soft); color:var(--danger); }
+.badge-important{ background:var(--warning-soft); color:var(--warning); }
+.badge-normal{ background:var(--surface-2); color:var(--text-muted); }
+.badge-overdue{ background:var(--danger-soft); color:var(--danger); }
+.badge-accent{ background:var(--accent-soft); color:var(--accent-strong); }
+.badge-demo{ background:var(--warning-soft); color:var(--warning); }
+
+/* ============================= BUTTONS ============================= */
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  font-size:14.5px; font-weight:600; padding:12px 18px; border-radius:var(--radius-s);
+  border:1px solid transparent; cursor:pointer; transition:transform .12s ease, opacity .12s ease;
+  min-height:44px;
+}
+.btn:active{ transform:scale(0.97); }
+.btn-primary{ background:var(--accent); color:#fff; }
+.btn-secondary{ background:var(--surface); border-color:var(--border-strong); color:var(--text); }
+.btn-ghost{ background:transparent; color:var(--text-muted); }
+.btn-danger{ background:transparent; color:var(--danger); border-color:var(--danger-soft); }
+.btn-block{ width:100%; }
+.btn-sm{ padding:8px 14px; font-size:13px; min-height:36px; }
+
+.chip{
+  display:inline-flex; align-items:center; gap:6px; padding:9px 15px; border-radius:20px;
+  border:1px solid var(--border-strong); background:var(--surface); font-size:13.5px; font-weight:600;
+  cursor:pointer; transition:all .12s ease; color:var(--text); min-height:40px;
+}
+.chip.selected{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.chip-row{ display:flex; flex-wrap:wrap; gap:8px; }
+
+/* ============================= FORMS ============================= */
+label{ font-size:12.5px; font-weight:700; color:var(--text-muted); display:block; margin:16px 0 7px; letter-spacing:.02em; }
+label:first-child{ margin-top:0; }
+input[type=text], input[type=date], input[type=time], input[type=number], input[type=tel], textarea, select{
+  width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--border-strong);
+  background:var(--bg-elevated); font-size:15px; color:var(--text);
+}
+textarea{ resize:vertical; min-height:80px; line-height:1.45; }
+input::placeholder, textarea::placeholder{ color:var(--text-faint); }
+
+/* ============================= EMPTY STATE ============================= */
+.empty{ text-align:center; padding:40px 20px; color:var(--text-muted); }
+.empty-icon{ font-size:34px; margin-bottom:10px; }
+.empty-title{ font-family:var(--font-display); font-size:17px; color:var(--text); margin-bottom:6px; }
+.empty-sub{ font-size:13.5px; line-height:1.5; max-width:280px; margin:0 auto 16px; }
+
+/* ============================= BOTTOM NAV / FAB ============================= */
+.bottom-nav{
+  position:fixed; bottom:0; left:0; right:0; z-index:30;
+  background:var(--bg-elevated); border-top:1px solid var(--border);
+  padding-bottom:var(--safe-bottom);
+}
+.bottom-nav-inner{
+  max-width:560px; margin:0 auto; display:flex; height:var(--nav-h);
+}
+.nav-item{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  background:none; border:none; cursor:pointer; color:var(--text-faint); font-size:10.5px; font-weight:600;
+  min-height:44px;
+}
+.nav-item svg{ width:21px; height:21px; }
+.nav-item.active{ color:var(--accent); }
+
+.fab{
+  position:fixed; left:50%; bottom:calc(var(--nav-h) + var(--safe-bottom) - 26px); transform:translateX(-50%);
+  width:58px; height:58px; border-radius:50%; background:var(--accent); color:#fff; border:none;
+  box-shadow:var(--shadow-l); display:flex; align-items:center; justify-content:center; cursor:pointer;
+  z-index:31; transition:transform .15s ease;
+}
+.fab:active{ transform:translateX(-50%) scale(0.92); }
+.fab svg{ width:26px; height:26px; }
+
+/* ============================= SHEET / MODAL ============================= */
+.scrim{
+  position:fixed; inset:0; background:var(--scrim); z-index:50; opacity:0; pointer-events:none;
+  transition:opacity .2s ease;
+}
+.scrim.open{ opacity:1; pointer-events:auto; }
+.sheet{
+  position:fixed; left:0; right:0; bottom:0; z-index:51; background:var(--bg-elevated);
+  border-radius:24px 24px 0 0; max-width:560px; margin:0 auto; max-height:88vh; overflow-y:auto;
+  transform:translateY(100%); transition:transform .28s cubic-bezier(.2,.8,.3,1);
+  box-shadow:var(--shadow-l); padding:10px 20px calc(24px + var(--safe-bottom));
+}
+.sheet.open{ transform:translateY(0); }
+.sheet-handle{ width:38px; height:4px; border-radius:3px; background:var(--border-strong); margin:6px auto 14px; }
+.sheet-title{ font-size:19px; margin-bottom:4px; }
+.sheet-sub{ font-size:13.5px; color:var(--text-muted); margin-bottom:16px; line-height:1.5; }
+.sheet-close{ position:absolute; top:16px; right:16px; }
+
+.dialog-scrim{ position:fixed; inset:0; background:var(--scrim); z-index:60; display:none; align-items:center; justify-content:center; padding:20px;}
+.dialog-scrim.open{ display:flex; }
+.dialog{ background:var(--surface); border-radius:var(--radius-l); padding:22px; max-width:360px; width:100%; box-shadow:var(--shadow-l); }
+.dialog h3{ font-size:17px; margin-bottom:8px; }
+.dialog p{ font-size:14px; color:var(--text-muted); line-height:1.5; margin-bottom:18px; }
+
+/* Toast */
+#toast{
+  position:fixed; left:50%; bottom:calc(var(--nav-h) + 24px + var(--safe-bottom)); transform:translateX(-50%) translateY(10px);
+  background:var(--text); color:var(--bg); padding:11px 18px; border-radius:30px; font-size:13.5px; font-weight:600;
+  z-index:70; opacity:0; pointer-events:none; transition:all .25s ease; box-shadow:var(--shadow-m); max-width:80%; text-align:center;
+}
+[data-theme-resolved="dark"] #toast{ background:var(--surface-2); color:var(--text); border:1px solid var(--border-strong); }
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* onboarding */
+.onboard-wrap{ min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; padding:calc(30px + var(--safe-top)) 26px calc(26px + var(--safe-bottom)); }
+.onboard-mark{ width:56px; height:56px; border-radius:16px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-size:28px; margin-bottom:22px; }
+.onboard-wrap h1{ font-size:30px; line-height:1.15; margin-bottom:10px; }
+.onboard-tagline{ font-size:15px; color:var(--text-muted); margin-bottom:26px; line-height:1.55; }
+.progress-dots{ display:flex; gap:6px; margin-bottom:22px; }
+.progress-dots span{ width:22px; height:4px; border-radius:3px; background:var(--border-strong); }
+.progress-dots span.on{ background:var(--accent); }
+
+.small-link{ font-size:13px; color:var(--text-muted); text-decoration:underline; background:none; border:none; cursor:pointer; padding:8px; }
+
+.avatar{ width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; font-size:17px; flex:0 0 auto; }
+.divider{ height:1px; background:var(--border); margin:14px 0; border:none; }
+
+.pill-toggle{ display:flex; background:var(--surface-2); border-radius:12px; padding:3px; gap:2px; }
+.pill-toggle button{ flex:1; border:none; background:none; padding:9px; border-radius:10px; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; }
+.pill-toggle button.active{ background:var(--surface); color:var(--text); box-shadow:var(--shadow-s); }
+
+.timeline-day{ margin-bottom:6px; }
+.timeline-date{ font-size:12px; font-weight:700; color:var(--text-faint); letter-spacing:.06em; text-transform:uppercase; margin:18px 2px 8px; }
+.timeline-entry{ display:flex; gap:12px; padding:9px 2px; }
+.timeline-time{ font-size:11.5px; color:var(--text-faint); width:56px; flex:0 0 auto; padding-top:2px; }
+.timeline-dot-wrap{ display:flex; flex-direction:column; align-items:center; flex:0 0 auto; }
+.timeline-dot{ width:8px; height:8px; border-radius:50%; background:var(--accent); margin-top:5px; }
+.timeline-line{ flex:1; width:1.5px; background:var(--border); margin-top:4px; }
+
+.profile-tabs{ display:flex; gap:6px; overflow-x:auto; padding:2px 0 14px; -ms-overflow-style:none; scrollbar-width:none; }
+.profile-tabs::-webkit-scrollbar{ display:none; }
+.profile-tab{ flex:0 0 auto; padding:9px 14px; border-radius:20px; border:1px solid var(--border); background:var(--surface); font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; }
+.profile-tab.active{ background:var(--text); color:var(--bg); border-color:var(--text); }
+
+.hero-card{ background:linear-gradient(160deg, var(--accent-soft), var(--surface)); border:1px solid var(--border); border-radius:var(--radius-l); padding:20px; margin-bottom:16px; }
+
+.swipe-actions{ display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+
+.privacy-note{ display:flex; gap:10px; align-items:flex-start; background:var(--accent-soft); border-radius:14px; padding:13px 14px; font-size:12.5px; color:var(--accent-strong); line-height:1.5; margin-bottom:16px;}
+.privacy-note svg{ flex:0 0 auto; margin-top:2px; }
+
+.k-v{ display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.k-v:last-child{ border-bottom:none; }
+.k-v .k{ color:var(--text-muted); }
+.k-v .v{ font-weight:600; }
+
+.mic-btn{ width:44px; height:44px; border-radius:50%; border:1.5px solid var(--border-strong); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto; }
+.mic-btn.recording{ background:var(--danger); border-color:var(--danger); color:#fff; animation:pulse 1.2s infinite; }
+@keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(178,74,52,.4);} 70%{box-shadow:0 0 0 10px rgba(178,74,52,0);} 100%{box-shadow:0 0 0 0 rgba(178,74,52,0);} }
+
+.fade-in{ animation:fadeIn .22s ease; }
+@keyframes fadeIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+.suggest-box{ background:var(--accent-soft); border-radius:14px; padding:13px 14px; margin:14px 0; font-size:13.5px; color:var(--accent-strong); }
+.suggest-box strong{ display:block; margin-bottom:8px; font-weight:700; }
+
+@media (min-width:601px){
+  #app{ box-shadow:var(--shadow-m); min-height:100vh; }
+  body{ background:var(--surface-2); }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="scrim" id="scrim" onclick="UI.closeSheet()"></div>
+<div class="sheet" id="sheet"></div>
+<div class="dialog-scrim" id="dialogScrim"><div class="dialog" id="dialogBox"></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* =========================================================================
+   STATE
+   ========================================================================= */
+const STORAGE_KEY = "remainder_data_v1";
+const APP_VERSION = 1;
+let memoryFallback = false;
+let state = null;
+let route = { screen:"home", params:{} };
+let searchDebounce = null;
+let notifiedThisSession = new Set();
+let recognizer = null;
+let listeningTarget = null;
+
+function defaultState(){
+  return {
+    version: APP_VERSION,
+    settings:{
+      theme:"system",
+      buvanName:"Buvan",
+      onboarded:false,
+      notifAsked:false,
+      cycleLength:28,
+      pmsOffset:5,
+      pmsChecklist:[
+        "Check how she's feeling",
+        "Ask if she needs anything",
+        "Be mindful of discomfort",
+        "Remember anything she mentioned before"
+      ]
+    },
+    people:[],
+    memories:[],
+    reminders:[],
+    followUps:[],
+    projects:[],
+    bucketList:[],
+    timeline:[],
+    cycles:[],
+    healthRecords:[],
+    notifications:{ permission:"default" }
+  };
+}
+
+/* =========================================================================
+   STORAGE
+   ========================================================================= */
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    return migrateData(parsed);
+  }catch(e){
+    console.warn("Remainder: localStorage unavailable, using in-memory data only.", e);
+    memoryFallback = true;
+    return defaultState();
+  }
+}
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    memoryFallback = true;
+    console.warn("Remainder: could not persist data.", e);
+  }
+}
+function migrateData(data){
+  if(!data || typeof data !== "object") return defaultState();
+  if(!data.version) data.version = 1;
+  const d = defaultState();
+  const merged = Object.assign({}, d, data);
+  merged.settings = Object.assign({}, d.settings, data.settings||{});
+  ["people","memories","reminders","followUps","projects","bucketList","timeline","cycles","healthRecords"].forEach(k=>{
+    if(!Array.isArray(merged[k])) merged[k] = [];
+  });
+  merged.version = APP_VERSION;
+  return merged;
+}
+
+/* =========================================================================
+   ID GENERATOR
+   ========================================================================= */
+function uid(prefix){
+  const rand = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+  return (prefix?prefix+"_":"")+rand;
+}
+
+/* =========================================================================
+   DATE UTILITIES
+   ========================================================================= */
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function parseLocal(dateStr){ if(!dateStr) return null; const p=dateStr.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+function toISO(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function addDays(dateStr,n){ const d=parseLocal(dateStr); d.setDate(d.getDate()+n); return toISO(d); }
+function addWeeks(dateStr,n){ return addDays(dateStr,n*7); }
+function addMonths(dateStr,n){ const d=parseLocal(dateStr); d.setMonth(d.getMonth()+n); return toISO(d); }
+function daysBetween(a,b){ const A=parseLocal(a), B=parseLocal(b); return Math.round((B-A)/86400000); }
+function isPastDateTime(dateStr,timeStr){
+  if(!dateStr) return false;
+  const now = new Date();
+  const d = parseLocal(dateStr);
+  if(timeStr){ const [h,m]=timeStr.split(":").map(Number); d.setHours(h,m,0,0); } else { d.setHours(23,59,59,999); }
+  return d.getTime() < now.getTime();
+}
+function formatTime12(t){
+  if(!t) return "";
+  let [h,m]=t.split(":").map(Number);
+  const ap = h>=12?"PM":"AM";
+  h = h%12; if(h===0) h=12;
+  return h+":"+String(m).padStart(2,"0")+" "+ap;
+}
+const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function humanDate(dateStr,timeStr){
+  if(!dateStr) return timeStr ? formatTime12(timeStr) : "";
+  const diff = daysBetween(todayStr(), dateStr);
+  let label;
+  if(diff===0) label="Today";
+  else if(diff===1) label="Tomorrow";
+  else if(diff===-1) label="Yesterday";
+  else if(diff<0) label=Math.abs(diff)+" day"+(Math.abs(diff)===1?"":"s")+" overdue";
+  else if(diff>1 && diff<7) label=WEEKDAYS[parseLocal(dateStr).getDay()];
+  else { const d=parseLocal(dateStr); label = MONTHS[d.getMonth()]+" "+d.getDate()+(d.getFullYear()!==new Date().getFullYear()?", "+d.getFullYear():""); }
+  if(timeStr) label += " · "+formatTime12(timeStr);
+  return label;
+}
+function isOverdue(dateStr,timeStr){ return dateStr && isPastDateTime(dateStr,timeStr); }
+function nowTimestamp(){ return new Date().toISOString(); }
+function humanTimestamp(iso){
+  const d = new Date(iso);
+  const ds = toISO(d);
+  const diff = daysBetween(ds, todayStr());
+  const time = (function(){ let h=d.getHours(); const m=d.getMinutes(); const ap=h>=12?"PM":"AM"; h=h%12; if(h===0)h=12; return h+":"+String(m).padStart(2,"0")+" "+ap; })();
+  if(diff===0) return time;
+  if(diff===1) return "Yesterday · "+time;
+  if(diff<7) return WEEKDAYS[d.getDay()]+" · "+time;
+  return MONTHS[d.getMonth()]+" "+d.getDate()+" · "+time;
+}
+function dayGroupLabel(iso){
+  const d = new Date(iso);
+  const ds = toISO(d);
+  const diff = daysBetween(ds, todayStr());
+  if(diff===0) return "Today";
+  if(diff===1) return "Yesterday";
+  if(diff<7) return WEEKDAYS[d.getDay()];
+  return MONTHS[d.getMonth()]+" "+d.getDate()+(d.getFullYear()!==new Date().getFullYear()?", "+d.getFullYear():"");
+}
+
+/* =========================================================================
+   PEOPLE
+   ========================================================================= */
+function addPerson(obj){
+  const p = Object.assign({
+    id: uid("p"), area:"friend", name:"", relationship:"", birthday:"", phone:"",
+    lastTalked:"", notes:"", preferences:{ likes:[], dislikes:[], favFood:"", favColor:"", placesToVisit:[], thingsToBuy:[], importantDates:[] },
+    createdAt: nowTimestamp(), isDemo:false
+  }, obj);
+  state.people.push(p);
+  saveState();
+  return p;
+}
+function updatePerson(id, patch){
+  const p = state.people.find(x=>x.id===id);
+  if(!p) return;
+  Object.assign(p, patch);
+  saveState();
+}
+function deletePerson(id){
+  state.people = state.people.filter(p=>p.id!==id);
+  saveState();
+}
+function getPerson(id){ return state.people.find(p=>p.id===id); }
+function peopleByArea(area){ return state.people.filter(p=>p.area===area); }
+function girlfriend(){ return state.people.find(p=>p.area==="girlfriend"); }
+function personLabel(personId){
+  if(personId==="buvan") return state.settings.buvanName;
+  const p = getPerson(personId);
+  return p ? p.name : "General";
+}
+function personArea(personId){
+  if(personId==="buvan") return "buvan";
+  const p = getPerson(personId);
+  return p ? p.area : "general";
+}
+function avatarColor(area){
+  return { buvan:"var(--accent)", girlfriend:"#B15C7A", family:"#5C7FB1", friend:"#B18A4A", general:"var(--text-muted)" }[area] || "var(--text-muted)";
+}
+function initials(name){
+  if(!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return (parts[0][0]+(parts[1]?parts[1][0]:"")).toUpperCase();
+}
+
+/* =========================================================================
+   MEMORIES
+   ========================================================================= */
+function addMemory(obj){
+  const m = Object.assign({ id:uid("m"), personId:"", text:"", category:"General", importance:"Normal", timestamp:nowTimestamp(), followUpId:null, isDemo:false }, obj);
+  state.memories.push(m);
+  addTimelineEntry({ personId:m.personId, text:m.text, category:m.category, timestamp:m.timestamp, refType:"memory", refId:m.id });
+  saveState();
+  return m;
+}
+function memoriesForPerson(personId){ return state.memories.filter(m=>m.personId===personId).sort((a,b)=> new Date(b.timestamp)-new Date(a.timestamp)); }
+
+/* =========================================================================
+   REMINDERS
+   ========================================================================= */
+function addReminder(obj){
+  const r = Object.assign({
+    id:uid("r"), title:"", description:"", personId:"", dueDate:"", dueTime:"",
+    repeatType:"none", repeatInterval:1, priority:"Normal", status:"pending",
+    linkedMemoryId:null, linkedProjectId:null, createdAt:nowTimestamp(), completedAt:null, isDemo:false
+  }, obj);
+  state.reminders.push(r);
+  saveState();
+  return r;
+}
+function updateReminder(id,patch){ const r=state.reminders.find(x=>x.id===id); if(!r) return; Object.assign(r,patch); saveState(); }
+function nextDueDate(r){
+  if(r.repeatType==="none") return null;
+  const n = r.repeatInterval||1;
+  if(r.repeatType==="daily") return addDays(r.dueDate,n);
+  if(r.repeatType==="weekly") return addWeeks(r.dueDate,n);
+  if(r.repeatType==="monthly") return addMonths(r.dueDate,n);
+  if(r.repeatType==="custom-days") return addDays(r.dueDate,n);
+  if(r.repeatType==="custom-weeks") return addWeeks(r.dueDate,n);
+  if(r.repeatType==="custom-months") return addMonths(r.dueDate,n);
+  return null;
+}
+function completeReminder(id, opts){
+  opts = opts||{};
+  const r = state.reminders.find(x=>x.id===id);
+  if(!r) return;
+  r.status="completed"; r.completedAt=nowTimestamp();
+  addTimelineEntry({ personId:r.personId, text:"Completed: "+r.title, category:"Reminder", timestamp:nowTimestamp(), refType:"reminder", refId:r.id });
+  if(opts.addMemoryText){
+    addMemory({ personId:r.personId||"buvan", text:opts.addMemoryText, category:"Follow-up", importance:"Normal" });
+  }
+  const nd = nextDueDate(r);
+  if(nd){
+    addReminder({ title:r.title, description:r.description, personId:r.personId, dueDate:nd, dueTime:r.dueTime, repeatType:r.repeatType, repeatInterval:r.repeatInterval, priority:r.priority, linkedProjectId:r.linkedProjectId });
+  }
+  saveState();
+}
+function rescheduleReminder(id, newDate, newTime){ updateReminder(id, { dueDate:newDate, dueTime:newTime||"", status:"pending" }); }
+function dismissReminder(id){ updateReminder(id, { status:"dismissed" }); }
+function activeReminders(){ return state.reminders.filter(r=>r.status==="pending"); }
+
+/* =========================================================================
+   FOLLOW-UPS
+   ========================================================================= */
+function addFollowUp(obj){
+  const f = Object.assign({ id:uid("f"), text:"", personId:"", dueDate:"", dueTime:"", status:"pending", linkedMemoryId:null, createdAt:nowTimestamp(), isDemo:false }, obj);
+  state.followUps.push(f);
+  saveState();
+  return f;
+}
+function completeFollowUp(id, opts){
+  opts = opts||{};
+  const f = state.followUps.find(x=>x.id===id);
+  if(!f) return;
+  f.status="completed";
+  addTimelineEntry({ personId:f.personId, text:"Followed up: "+f.text, category:"Follow-up", timestamp:nowTimestamp(), refType:"followup", refId:f.id });
+  if(opts.addMemoryText){ addMemory({ personId:f.personId||"buvan", text:opts.addMemoryText, category:"Follow-up", importance:"Normal" }); }
+  saveState();
+}
+function rescheduleFollowUp(id,newDate){ const f=state.followUps.find(x=>x.id===id); if(!f) return; f.dueDate=newDate; f.status="pending"; saveState(); }
+function dismissFollowUp(id){ const f=state.followUps.find(x=>x.id===id); if(!f) return; f.status="dismissed"; saveState(); }
+function activeFollowUps(){ return state.followUps.filter(f=>f.status==="pending"); }
+
+/* =========================================================================
+   PROJECTS (Buvan)
+   ========================================================================= */
+function addProject(obj){
+  const p = Object.assign({ id:uid("proj"), title:"", description:"", status:"active", tasks:[], notes:"", nextAction:"", timeline:"", createdAt:nowTimestamp(), isDemo:false }, obj);
+  state.projects.push(p);
+  saveState();
+  return p;
+}
+function updateProject(id,patch){ const p=state.projects.find(x=>x.id===id); if(!p) return; Object.assign(p,patch); saveState(); }
+function addProjectTask(projId, text){
+  const p = state.projects.find(x=>x.id===projId); if(!p) return;
+  p.tasks.push({ id:uid("t"), text, done:false });
+  saveState();
+}
+function toggleProjectTask(projId, taskId){
+  const p = state.projects.find(x=>x.id===projId); if(!p) return;
+  const t = p.tasks.find(x=>x.id===taskId); if(!t) return;
+  t.done = !t.done; saveState();
+}
+function deleteProject(id){ state.projects = state.projects.filter(p=>p.id!==id); saveState(); }
+
+/* =========================================================================
+   BUCKET LIST
+   ========================================================================= */
+function addBucketItem(obj){
+  const b = Object.assign({ id:uid("b"), personId:"buvan", title:"", description:"", timeline:"Someday", targetDate:"", priority:"Normal", status:"open", notes:"", createdAt:nowTimestamp(), isDemo:false }, obj);
+  state.bucketList.push(b);
+  saveState();
+  return b;
+}
+function updateBucketItem(id,patch){ const b=state.bucketList.find(x=>x.id===id); if(!b) return; Object.assign(b,patch); saveState(); }
+function deleteBucketItem(id){ state.bucketList = state.bucketList.filter(b=>b.id!==id); saveState(); }
+function bucketFor(personId){ return state.bucketList.filter(b=>b.personId===personId); }
+
+/* =========================================================================
+   TIMELINE
+   ========================================================================= */
+function addTimelineEntry(obj){
+  const t = Object.assign({ id:uid("tl"), personId:"", text:"", category:"General", timestamp:nowTimestamp(), refType:"", refId:"" }, obj);
+  state.timeline.push(t);
+  return t;
+}
+function timelineForPerson(personId){ return state.timeline.filter(t=>t.personId===personId).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)); }
+function globalTimeline(filterArea){
+  let items = state.timeline.slice();
+  if(filterArea && filterArea!=="all"){
+    items = items.filter(t=> personArea(t.personId)===filterArea );
+  }
+  return items.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+}
+
+/* =========================================================================
+   PERIOD TRACKER
+   ========================================================================= */
+function addCycleEntry(startDate){
+  state.cycles.push({ id:uid("cy"), startDate });
+  state.cycles.sort((a,b)=> a.startDate.localeCompare(b.startDate));
+  saveState();
+  maybeCreatePmsTimelineNote();
+}
+function deleteCycleEntry(id){ state.cycles = state.cycles.filter(c=>c.id!==id); saveState(); }
+function latestCycle(){ if(!state.cycles.length) return null; return state.cycles[state.cycles.length-1]; }
+function periodPredictions(){
+  const last = latestCycle();
+  if(!last) return null;
+  const cycleLength = state.settings.cycleLength||28;
+  const pmsOffset = state.settings.pmsOffset||5;
+  const nextPeriod = addDays(last.startDate, cycleLength);
+  const pmsStart = addDays(nextPeriod, -pmsOffset);
+  const currentDay = daysBetween(last.startDate, todayStr())+1;
+  const daysRemaining = daysBetween(todayStr(), nextPeriod);
+  const inPmsWindow = todayStr()>=pmsStart && todayStr()<nextPeriod;
+  return { lastStart:last.startDate, cycleLength, pmsOffset, nextPeriod, pmsStart, currentDay, daysRemaining, inPmsWindow };
+}
+function maybeCreatePmsTimelineNote(){
+  const pred = periodPredictions();
+  if(!pred || !pred.inPmsWindow) return;
+  const gf = girlfriend();
+  if(!gf) return;
+  const already = state.reminders.find(r=> r.personId===gf.id && r.title==="PMS window reminder" && r.dueDate===pred.pmsStart);
+  if(already) return;
+  addReminder({ title:"PMS window reminder", description: state.settings.pmsChecklist.join(" · "), personId:gf.id, dueDate:pred.pmsStart, priority:"Important", repeatType:"none" });
+}
+
+/* =========================================================================
+   HEALTH RECORDS (family)
+   ========================================================================= */
+function addHealthRecord(obj){
+  const h = Object.assign({ id:uid("h"), personId:"", type:"issue", issue:"", notes:"", dateAdded:todayStr(), status:"active",
+    medicineName:"", dosage:"", frequency:"", doctor:"", visitDate:"", reason:"", nextVisit:"", isDemo:false }, obj);
+  state.healthRecords.push(h);
+  addTimelineEntry({ personId:h.personId, text: healthRecordLabel(h), category:"Health", timestamp:nowTimestamp(), refType:"health", refId:h.id });
+  saveState();
+  return h;
+}
+function healthRecordLabel(h){
+  if(h.type==="issue") return "Health note: "+h.issue;
+  if(h.type==="medicine") return "Medicine added: "+h.medicineName;
+  if(h.type==="visit") return "Doctor visit: "+h.doctor+(h.reason?" — "+h.reason:"");
+  return "Health record updated";
+}
+function healthFor(personId){ return state.healthRecords.filter(h=>h.personId===personId); }
+function deleteHealthRecord(id){ state.healthRecords = state.healthRecords.filter(h=>h.id!==id); saveState(); }
+
+/* =========================================================================
+   SEARCH
+   ========================================================================= */
+function searchEverything(query){
+  const q = query.trim().toLowerCase();
+  if(!q) return [];
+  const results = [];
+  state.people.forEach(p=>{
+    const hay = [p.name,p.notes,p.relationship,(p.preferences&&p.preferences.favFood)||"",(p.preferences&&p.preferences.favColor)||""].join(" ").toLowerCase();
+    if(hay.includes(q)) results.push({ kind:"Person", personId:p.id, title:p.name, sub:p.relationship||p.area, date:"" });
+  });
+  state.memories.forEach(m=>{ if(m.text.toLowerCase().includes(q)) results.push({ kind:"Memory", personId:m.personId, title:m.text, sub:personLabel(m.personId), date:humanTimestamp(m.timestamp) }); });
+  state.reminders.forEach(r=>{ const hay=(r.title+" "+r.description).toLowerCase(); if(hay.includes(q)) results.push({ kind:"Reminder", personId:r.personId, title:r.title, sub:personLabel(r.personId)+" · "+r.status, date:humanDate(r.dueDate,r.dueTime) }); });
+  state.followUps.forEach(f=>{ if(f.text.toLowerCase().includes(q)) results.push({ kind:"Follow-up", personId:f.personId, title:f.text, sub:personLabel(f.personId), date:humanDate(f.dueDate) }); });
+  state.projects.forEach(p=>{ const hay=(p.title+" "+p.description+" "+p.notes).toLowerCase(); if(hay.includes(q)) results.push({ kind:"Project", personId:"buvan", title:p.title, sub:p.nextAction||"Buvan project", date:"" }); });
+  state.bucketList.forEach(b=>{ const hay=(b.title+" "+b.description+" "+b.notes).toLowerCase(); if(hay.includes(q)) results.push({ kind:"Bucket list", personId:b.personId, title:b.title, sub:b.timeline, date:"" }); });
+  state.healthRecords.forEach(h=>{ const hay=(h.issue+" "+h.notes+" "+h.medicineName+" "+h.doctor).toLowerCase(); if(hay.includes(q)) results.push({ kind:"Health", personId:h.personId, title:healthRecordLabel(h), sub:personLabel(h.personId), date:h.dateAdded }); });
+  state.timeline.forEach(t=>{ if(t.text.toLowerCase().includes(q)) results.push({ kind:"Timeline", personId:t.personId, title:t.text, sub:personLabel(t.personId), date:humanTimestamp(t.timestamp) }); });
+  return results;
+}
+
+/* =========================================================================
+   CONTEXTUAL SUGGESTION ENGINE
+   ========================================================================= */
+function analyzeText(text){
+  const t = text.toLowerCase();
+  const out = { suggestReminder:false, suggestFollowUp:false, suggestedImportance:"Normal", suggestedCategory:"General", suggestedArea:null, matched:[] };
+  const has = (words)=> words.some(w=>t.includes(w));
+  if(has(["call"])){ out.suggestReminder=true; out.matched.push("call"); }
+  if(has(["birthday"])){ out.suggestReminder=true; out.suggestedCategory="Birthday"; out.matched.push("birthday"); }
+  if(has(["doctor","medicine","appointment","pain","hurt"])){ out.suggestFollowUp=true; out.suggestedCategory="Health"; out.suggestedImportance="Important"; out.matched.push("health"); }
+  if(has(["tomorrow","next week","next month"])){ out.suggestReminder=true; out.matched.push("timing"); }
+  if(has(["passport","licence","license","deadline"])){ out.suggestedImportance="Important"; out.suggestedArea="buvan"; out.matched.push("document"); }
+  if(has(["she ","her ","girlfriend"])){ out.suggestedArea="girlfriend"; }
+  if(has(["mom","dad","mother","father","parents"])){ out.suggestedArea="family"; }
+  return out;
+}
+
+/* =========================================================================
+   NOTIFICATIONS
+   ========================================================================= */
+function notifSupported(){ return "Notification" in window; }
+function requestNotifPermission(){
+  if(!notifSupported()){ state.notifications.permission="unsupported"; saveState(); return; }
+  Notification.requestPermission().then(p=>{ state.notifications.permission=p; saveState(); });
+}
+function checkDueReminders(){
+  if(!notifSupported() || Notification.permission!=="granted") return;
+  const now = new Date();
+  activeReminders().forEach(r=>{
+    if(!r.dueDate) return;
+    if(notifiedThisSession.has(r.id)) return;
+    if(isPastDateTime(r.dueDate, r.dueTime) ){
+      const dueMoment = parseLocal(r.dueDate);
+      if(r.dueTime){ const [h,m]=r.dueTime.split(":").map(Number); dueMoment.setHours(h,m,0,0); }
+      if(now - dueMoment < 12*3600*1000){
+        try{ new Notification("Remainder: "+r.title, { body:r.description||("For "+personLabel(r.personId)) }); }catch(e){}
+        notifiedThisSession.add(r.id);
+      }
+    }
+  });
+}
+
+/* =========================================================================
+   VOICE INPUT
+   ========================================================================= */
+function voiceSupported(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+function startVoice(targetId){
+  if(!voiceSupported()){ showToast("Voice input isn't supported in this browser. You can type instead."); return; }
+  const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognizer = new Rec();
+  recognizer.lang = "en-US"; recognizer.interimResults=false; recognizer.maxAlternatives=1;
+  listeningTarget = targetId;
+  const btn = document.getElementById("micBtn");
+  if(btn) btn.classList.add("recording");
+  recognizer.onresult = (e)=>{
+    const text = e.results[0][0].transcript;
+    const el = document.getElementById(targetId);
+    if(el){ el.value = (el.value ? el.value+" " : "")+text; el.dispatchEvent(new Event("input")); }
+  };
+  recognizer.onend = ()=>{ if(btn) btn.classList.remove("recording"); };
+  recognizer.onerror = ()=>{ if(btn) btn.classList.remove("recording"); showToast("Couldn't catch that — try typing instead."); };
+  try{ recognizer.start(); }catch(e){}
+}
+
+/* =========================================================================
+   IMPORT / EXPORT
+   ========================================================================= */
+function exportData(){
+  const blob = new Blob([JSON.stringify(state,null,2)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "remainder-backup-"+todayStr()+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast("Backup exported");
+}
+function importDataFromFile(file){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    let parsed;
+    try{ parsed = JSON.parse(e.target.result); }
+    catch(err){ showToast("That file isn't valid backup data."); return; }
+    if(!parsed || typeof parsed!=="object" || !("people" in parsed)){ showToast("That file doesn't look like a Remainder backup."); return; }
+    UI.confirmDialog({
+      title:"Replace current data?",
+      body:"This backup will replace the current local data. This can't be undone.",
+      confirmLabel:"Replace data", danger:true,
+      onConfirm:()=>{ state = migrateData(parsed); saveState(); UI.render(); showToast("Backup restored"); }
+    });
+  };
+  reader.readAsText(file);
+}
+function resetAllData(){
+  UI.confirmDialog({
+    title:"Reset all data?",
+    body:"This permanently erases everything stored in Remainder on this device.",
+    confirmLabel:"Erase everything", danger:true,
+    onConfirm:()=>{ state = defaultState(); saveState(); route={screen:"onboarding",params:{}}; UI.render(); }
+  });
+}
+
+/* =========================================================================
+   DEMO DATA
+   ========================================================================= */
+function loadDemoData(){
+  const gf = addPerson({ area:"girlfriend", name:"Ananya", relationship:"Girlfriend", birthday:"1998-04-12", isDemo:true,
+    preferences:{ likes:["Rainy evenings","Filter coffee","Old Bollywood songs"], dislikes:["Being rushed"], favFood:"Butter chicken", favColor:"Sage green", placesToVisit:["Ladakh","Kyoto"], thingsToBuy:["A warm jacket"], importantDates:[] } });
+  addMemory({ personId:gf.id, text:"She mentioned her stomach was hurting a little.", category:"Health", importance:"Important", isDemo:true });
+  addFollowUp({ personId:gf.id, text:"Check how she's feeling after the stomach pain.", dueDate:addDays(todayStr(),1), isDemo:true });
+  addBucketItem({ personId:gf.id, title:"Weekend trip to the hills", timeline:"Someday", isDemo:true });
+
+  const mom = addPerson({ area:"family", name:"Mom", relationship:"Mother", phone:"", notes:"", isDemo:true });
+  addHealthRecord({ personId:mom.id, type:"visit", doctor:"Dr. Rao", visitDate:todayStr(), reason:"Routine check-up", nextVisit:addDays(todayStr(),30), isDemo:true });
+  addReminder({ title:"Call Mom", personId:mom.id, dueDate:todayStr(), repeatType:"weekly", repeatInterval:1, priority:"Normal", isDemo:true });
+
+  const arun = addPerson({ area:"friend", name:"Arun", relationship:"Friend", lastTalked:addDays(todayStr(),-34), isDemo:true });
+  addFollowUp({ personId:arun.id, text:"Haven't talked to Arun in a while — check in.", dueDate:todayStr(), isDemo:true });
+
+  const proj = addProject({ title:"Passport renewal", description:"Renew before it expires.", nextAction:"Book appointment slot online", isDemo:true });
+  addProjectTask(proj.id,"Fill application form");
+  addProjectTask(proj.id,"Book appointment");
+  addBucketItem({ personId:"buvan", title:"Visit Goa", timeline:"Someday", isDemo:true });
+  addReminder({ title:"Passport appointment reminder", personId:"buvan", dueDate:addDays(todayStr(),3), priority:"Important", linkedProjectId:proj.id, isDemo:true });
+
+  saveState();
+  showToast("Demo data loaded");
+  UI.render();
+}
+
+/* =========================================================================
+   UI HELPERS
+   ========================================================================= */
+function esc(s){ return (s||"").toString().replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function nl2br(s){ return esc(s).replace(/\n/g,"<br>"); }
+function icon(name){
+  const icons = {
+    home:'<path d="M4 11.5 12 4l8 7.5M6 10v9a1 1 0 0 0 1 1h4v-6h2v6h4a1 1 0 0 0 1-1v-9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    people:'<circle cx="8.5" cy="8" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="16" cy="9" r="2.4" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M2.8 19c.6-3.3 2.9-5 5.7-5s5.1 1.7 5.7 5M14.8 19c.3-2 1.6-3.6 3.6-4.3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>',
+    timeline:'<path d="M4 6h13M4 12h9M4 18h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="19" cy="6" r="1.6" fill="currentColor"/><circle cx="15" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="18" r="1.6" fill="currentColor"/>',
+    search:'<circle cx="10.5" cy="10.5" r="6.2" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M20 20l-4.8-4.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    more:'<circle cx="5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="19" cy="12" r="1.7" fill="currentColor"/>',
+    plus:'<path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
+    check:'<path d="M4 10.5 8.2 15 16 5" stroke="currentColor" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    back:'<path d="M15 5 8 12l7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+    settings:'<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 2.5v3M12 18.5v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2.5 12h3M18.5 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>',
+    mic:'<rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/>',
+    shield:'<path d="M12 3l7 3v5c0 5-3 7.5-7 10-4-2.5-7-5-7-10V6l7-3z" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linejoin="round"/>',
+    close:'<path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'
+  };
+  return '<svg viewBox="0 0 24 24" fill="none">'+(icons[name]||"")+'</svg>';
+}
+
+let toastTimer=null;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2400);
+}
+
+function priorityBadge(p){
+  const map = { Critical:"badge-critical", Important:"badge-important", Normal:"badge-normal", Low:"badge-normal" };
+  const icons = { Critical:"‼", Important:"!", Normal:"", Low:"" };
+  if(p==="Normal"||p==="Low"||!p) return "";
+  return '<span class="badge '+(map[p]||"badge-normal")+'">'+icons[p]+' '+esc(p)+'</span>';
+}
+
+const UI = {};
+
+/* ---------- SHEET / DIALOG ---------- */
+UI.openSheet = function(html){
+  document.getElementById("sheet").innerHTML = html;
+  document.getElementById("scrim").classList.add("open");
+  requestAnimationFrame(()=>document.getElementById("sheet").classList.add("open"));
+  document.body.style.overflow="hidden";
+};
+UI.closeSheet = function(){
+  document.getElementById("sheet").classList.remove("open");
+  document.getElementById("scrim").classList.remove("open");
+  document.body.style.overflow="";
+};
+UI.confirmDialog = function(opts){
+  const box = document.getElementById("dialogBox");
+  box.innerHTML = `
+    <h3>${esc(opts.title)}</h3>
+    <p>${esc(opts.body)}</p>
+    <div class="row" style="justify-content:flex-end; gap:10px;">
+      <button class="btn btn-ghost" onclick="UI.closeDialog()">Cancel</button>
+      <button class="btn ${opts.danger?'btn-danger':'btn-primary'}" id="dialogConfirmBtn" style="${opts.danger?'background:var(--danger);color:#fff;border-color:var(--danger);':''}">${esc(opts.confirmLabel||"Confirm")}</button>
+    </div>`;
+  document.getElementById("dialogScrim").classList.add("open");
+  document.getElementById("dialogConfirmBtn").onclick = ()=>{ UI.closeDialog(); opts.onConfirm && opts.onConfirm(); };
+};
+UI.closeDialog = function(){ document.getElementById("dialogScrim").classList.remove("open"); };
+
+/* ---------- THEME ---------- */
+function resolveTheme(){
+  const t = state.settings.theme;
+  let resolved = t;
+  if(t==="system") resolved = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light";
+  document.documentElement.setAttribute("data-theme-resolved", resolved);
+}
+function setTheme(t){ state.settings.theme=t; saveState(); resolveTheme(); UI.render(); }
+
+/* ---------- NAV ---------- */
+function navigate(screen, params){ route = { screen, params: params||{} }; window.scrollTo(0,0); UI.render(); }
+UI.nav = navigate;
+
+/* =========================================================================
+   RENDER: SHELL
+   ========================================================================= */
+UI.render = function(){
+  resolveTheme();
+  const app = document.getElementById("app");
+  if(!state.settings.onboarded){ app.innerHTML = renderOnboarding(); attachOnboardingHandlers(); return; }
+
+  let content = "";
+  let title = "Remainder";
+  switch(route.screen){
+    case "home": content = renderHome(); title="Remainder"; break;
+    case "people": content = renderPeopleList(); title="People"; break;
+    case "areaList": content = renderAreaList(route.params.area); title = route.params.area==="family"?"Family":"Friends"; break;
+    case "person": content = renderPersonDetail(route.params.id); title = personLabel(route.params.id); break;
+    case "buvan": content = renderBuvan(); title = state.settings.buvanName; break;
+    case "timeline": content = renderTimeline(); title="Timeline"; break;
+    case "search": content = renderSearch(); title="Search"; break;
+    case "more": content = renderMore(); title="More"; break;
+    case "settings": content = renderSettings(); title="Settings"; break;
+    case "period": content = renderPeriodTracker(); title="Period Tracker"; break;
+    default: content = renderHome();
+  }
+
+  app.innerHTML = `
+    <div class="topbar">
+      <div class="topbar-row">
+        ${route.screen==="home" ? `<h1>Remainder</h1>` : `<button class="icon-btn" onclick="UI.back()" aria-label="Back">${icon('back')}</button>`}
+        <h1 style="${route.screen==='home'?'display:none':''}">${esc(title)}</h1>
+        <div class="row">
+          <button class="icon-btn" onclick="UI.nav('search')" aria-label="Search">${icon('search')}</button>
+        </div>
+      </div>
+    </div>
+    <main class="fade-in">${content}</main>
+  `;
+  renderBottomNav();
+  attachScreenHandlers();
+};
+UI.back = function(){
+  const map = { person:"people", areaList:"people", settings:"more", period:"person", buvan:"people" };
+  if(route.screen==="areaList") navigate("people");
+  else if(route.screen==="person") navigate("people");
+  else if(route.screen==="period") navigate(route.params.backTo||"people", route.params.backParams||{});
+  else navigate(map[route.screen]||"home");
+};
+
+function renderBottomNav(){
+  const items = [
+    { s:"home", label:"Home", i:"home" },
+    { s:"people", label:"People", i:"people" },
+    { s:"timeline", label:"Timeline", i:"timeline" },
+    { s:"search", label:"Search", i:"search" },
+    { s:"more", label:"More", i:"more" },
+  ];
+  const nav = document.createElement("div");
+  const active = ["person","areaList","buvan"].includes(route.screen) ? "people" : (route.screen==="settings"||route.screen==="period" ? "more": route.screen);
+  nav.className="bottom-nav";
+  nav.innerHTML = `<div class="bottom-nav-inner">${items.map(it=>`
+    <button class="nav-item ${active===it.s?'active':''}" onclick="UI.nav('${it.s}')">${icon(it.i)}<span>${it.label}</span></button>
+  `).join("")}</div>`;
+  document.querySelectorAll(".bottom-nav").forEach(n=>n.remove());
+  document.querySelectorAll(".fab").forEach(n=>n.remove());
+  document.body.appendChild(nav);
+  const fab = document.createElement("button");
+  fab.className="fab"; fab.setAttribute("aria-label","Quick capture");
+  fab.innerHTML = icon("plus");
+  fab.onclick = ()=>Capture.open();
+  document.body.appendChild(fab);
+}
+
+/* =========================================================================
+   RENDER: HOME
+   ========================================================================= */
+function computeHomeItems(){
+  const overdue = [];
+  const today = [];
+  const upcoming = [];
+  activeReminders().forEach(r=>{
+    if(!r.dueDate) return;
+    const entry = { type:"reminder", id:r.id, title:r.title, personId:r.personId, dueDate:r.dueDate, dueTime:r.dueTime, priority:r.priority };
+    if(isOverdue(r.dueDate,r.dueTime)) overdue.push(entry);
+    else if(r.dueDate===todayStr()) today.push(entry);
+    else if(daysBetween(todayStr(),r.dueDate)<=7) upcoming.push(entry);
+  });
+  activeFollowUps().forEach(f=>{
+    const entry = { type:"followup", id:f.id, title:f.text, personId:f.personId, dueDate:f.dueDate, dueTime:f.dueTime, priority:"Normal" };
+    if(f.dueDate && isOverdue(f.dueDate,null)) overdue.push(entry);
+    else if(!f.dueDate || f.dueDate===todayStr()) today.push(entry);
+    else if(daysBetween(todayStr(),f.dueDate)<=7) upcoming.push(entry);
+  });
+  const order = { Critical:0, Important:1, Normal:2, Low:3 };
+  const sorter = (a,b)=> (order[a.priority]??2)-(order[b.priority]??2);
+  overdue.sort(sorter); today.sort(sorter); upcoming.sort((a,b)=> a.dueDate.localeCompare(b.dueDate));
+  return { overdue, today, upcoming };
+}
+
+function itemRow(entry){
+  const isDone = false;
+  return `
+  <div class="list-item" onclick="ItemActions.open('${entry.type}','${entry.id}')">
+    <div class="check-circle" onclick="event.stopPropagation(); ItemActions.quickComplete('${entry.type}','${entry.id}')">${icon('check')}</div>
+    <div style="flex:1; min-width:0;">
+      <div class="row-between">
+        <div class="item-title">${esc(entry.title)}</div>
+        ${priorityBadge(entry.priority)}
+      </div>
+      <div class="item-sub">${esc(personLabel(entry.personId)||'General')}${entry.dueDate?' · '+humanDate(entry.dueDate,entry.dueTime):''}</div>
+    </div>
+  </div>`;
+}
+
+function renderHome(){
+  const { overdue, today, upcoming } = computeHomeItems();
+  const hour = new Date().getHours();
+  const greet = hour<5?"Still up":hour<12?"Good morning":hour<17?"Good afternoon":hour<21?"Good evening":"Good night";
+  const total = overdue.length+today.length;
+  let summary;
+  if(total===0 && upcoming.length===0) summary = "Nothing needs your attention right now.";
+  else {
+    const parts = [];
+    if(total>0) parts.push(total+" thing"+(total===1?"":"s")+" need"+(total===1?"s":"")+" your attention");
+    if(overdue.length>0) parts.push(overdue.length+" follow-up"+(overdue.length===1?" is":"s are")+" overdue");
+    if(upcoming.length>0) parts.push(upcoming.length+" important thing"+(upcoming.length===1?" is":"s are")+" coming up");
+    summary = parts.join(". ")+".";
+  }
+
+  let html = `
+    <div class="hero-card">
+      <div style="font-size:13px; color:var(--text-muted); font-weight:600; margin-bottom:4px;">${greet}, ${esc(state.settings.buvanName)}</div>
+      <div style="font-family:var(--font-display); font-size:19px; line-height:1.4;">${esc(summary)}</div>
+    </div>
+  `;
+
+  if(overdue.length===0 && today.length===0 && upcoming.length===0){
+    html += emptyState("🌤️","Nothing on your plate","Capture a memory, a reminder, or a follow-up with the button below — Remainder will help you keep track.");
+  }
+
+  if(overdue.length){
+    html += `<div class="section-title">Overdue</div><div class="card">${overdue.map(itemRow).join("")}</div>`;
+  }
+  if(today.length){
+    html += `<div class="section-title">Today</div><div class="card">${today.map(itemRow).join("")}</div>`;
+  }
+  if(upcoming.length){
+    html += `<div class="section-title">Upcoming</div><div class="card">${upcoming.map(itemRow).join("")}</div>`;
+  }
+  return html;
+}
+
+/* =========================================================================
+   RENDER: PEOPLE
+   ========================================================================= */
+function summarizeArea(area){
+  if(area==="buvan"){
+    const projects = state.projects.filter(p=>p.status==="active").length;
+    const bl = bucketFor("buvan").length;
+    return projects+" active project"+(projects===1?"":"s")+" · "+bl+" bucket-list item"+(bl===1?"":"s");
+  }
+  if(area==="girlfriend"){
+    const gf = girlfriend();
+    if(!gf) return "Not set up yet";
+    const fu = activeFollowUps().filter(f=>f.personId===gf.id).length;
+    const rem = activeReminders().filter(r=>r.personId===gf.id).length;
+    const mem = memoriesForPerson(gf.id).length;
+    return fu+" follow-up"+(fu===1?"":"s")+" · "+rem+" reminder"+(rem===1?"":"s")+" · "+mem+" memor"+(mem===1?"y":"ies");
+  }
+  if(area==="family"){
+    const members = peopleByArea("family");
+    const rem = activeReminders().filter(r=>members.some(m=>m.id===r.personId)).length;
+    return members.length+" member"+(members.length===1?"":"s")+" · "+rem+" reminder"+(rem===1?"":"s");
+  }
+  if(area==="friend"){
+    const fr = peopleByArea("friend");
+    const soonBday = fr.filter(f=>f.birthday && daysBetween(todayStr(), nextBirthday(f.birthday))<=30).length;
+    return fr.length+" friend"+(fr.length===1?"":"s")+" · "+soonBday+" birthday"+(soonBday===1?"":"s")+" coming up";
+  }
+  return "";
+}
+function nextBirthday(bday){
+  if(!bday) return null;
+  const d = parseLocal(bday);
+  const y = new Date().getFullYear();
+  let next = new Date(y, d.getMonth(), d.getDate());
+  if(next < new Date(new Date().toDateString())) next = new Date(y+1, d.getMonth(), d.getDate());
+  return toISO(next);
+}
+
+function areaCard(area,label,emoji){
+  return `
+  <div class="card card-tap" onclick="${area==='buvan'?"UI.nav('buvan')": area==='girlfriend'? (girlfriend()?`UI.nav('person',{id:'${girlfriend().id}'})`:`People.addGirlfriend()`) : `UI.nav('areaList',{area:'${area}'})`}">
+    <div class="row">
+      <div class="avatar" style="background:${avatarColor(area)}22; color:${avatarColor(area)};">${emoji}</div>
+      <div style="flex:1; min-width:0;">
+        <div class="item-title">${label}</div>
+        <div class="item-sub">${summarizeArea(area)}</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderPeopleList(){
+  return `
+    ${areaCard('buvan', state.settings.buvanName, '🌱')}
+    ${areaCard('girlfriend', girlfriend()?girlfriend().name:'Girlfriend', '💚')}
+    ${areaCard('family', 'Family', '🏡')}
+    ${areaCard('friend', 'Friends', '☀️')}
+  `;
+}
+
+function renderAreaList(area){
+  const list = peopleByArea(area);
+  let html = "";
+  if(!list.length){
+    html += emptyState(area==="family"?"🏡":"☀️", area==="family"?"No family members yet":"No friends yet", "Add someone you want to remember.");
+  } else {
+    html += `<div class="card">`+list.map(p=>`
+      <div class="list-item" onclick="UI.nav('person',{id:'${p.id}'})">
+        <div class="avatar" style="background:${avatarColor(area)}22; color:${avatarColor(area)};">${initials(p.name)}</div>
+        <div style="flex:1;">
+          <div class="item-title">${esc(p.name)}${p.isDemo?' <span class="badge badge-demo">Demo</span>':''}</div>
+          <div class="item-sub">${esc(p.relationship||'')}${area==='friend'&&p.lastTalked?' · Last talked '+humanDate(p.lastTalked):''}</div>
+        </div>
+      </div>`).join("")+`</div>`;
+  }
+  html += `<button class="btn btn-secondary btn-block" style="margin-top:8px;" onclick="People.addToArea('${area}')">+ Add ${area==='family'?'family member':'friend'}</button>`;
+  return html;
+}
+
+function emptyState(emoji,title,sub){
+  return `<div class="empty"><div class="empty-icon">${emoji}</div><div class="empty-title">${esc(title)}</div><div class="empty-sub">${esc(sub)}</div></div>`;
+}
+
+/* -------- Person detail -------- */
+function renderPersonDetail(id){
+  const p = getPerson(id);
+  if(!p) return emptyState("🙂","Not found","This person no longer exists.");
+  const tab = route.params.tab || defaultTab(p.area);
+  const tabs = personTabs(p.area);
+  let body = "";
+  if(tab==="overview") body = personOverview(p);
+  if(tab==="preferences") body = personPreferences(p);
+  if(tab==="bucket") body = personBucketList(p);
+  if(tab==="timeline") body = renderPersonTimeline(p);
+  if(tab==="health") body = personHealth(p);
+  if(tab==="reminders") body = personReminders(p);
+  if(tab==="followups") body = personFollowUps(p);
+
+  return `
+    <div class="row" style="margin-bottom:6px;">
+      <div class="avatar" style="width:52px;height:52px;font-size:19px;background:${avatarColor(p.area)}22; color:${avatarColor(p.area)};">${initials(p.name)}</div>
+      <div style="flex:1;">
+        <div style="font-family:var(--font-display); font-size:19px;">${esc(p.name)}</div>
+        <div class="item-sub">${esc(p.relationship||areaLabel(p.area))}${p.isDemo?' · <span class="badge badge-demo">Demo</span>':''}</div>
+      </div>
+      <button class="icon-btn" onclick="People.editBasics('${p.id}')" aria-label="Edit">${icon('settings')}</button>
+    </div>
+    <div class="profile-tabs">
+      ${tabs.map(t=>`<button class="profile-tab ${tab===t.key?'active':''}" onclick="UI.nav('person',{id:'${p.id}',tab:'${t.key}'})">${t.label}</button>`).join("")}
+    </div>
+    ${body}
+  `;
+}
+function areaLabel(a){ return { girlfriend:"Girlfriend", family:"Family", friend:"Friend" }[a] || a; }
+function defaultTab(area){ return area==="girlfriend" ? "timeline" : area==="family" ? "health" : "overview"; }
+function personTabs(area){
+  if(area==="girlfriend") return [ {key:"timeline",label:"Timeline"}, {key:"preferences",label:"Preferences"}, {key:"bucket",label:"Bucket list"}, {key:"reminders",label:"Reminders"}, {key:"followups",label:"Follow-ups"} ];
+  if(area==="family") return [ {key:"health",label:"Health"}, {key:"overview",label:"Info"}, {key:"reminders",label:"Reminders"}, {key:"timeline",label:"Timeline"} ];
+  return [ {key:"overview",label:"Info"}, {key:"followups",label:"Follow-ups"}, {key:"reminders",label:"Reminders"} ];
+}
+
+function personOverview(p){
+  let html = `<div class="card">
+    <div class="k-v"><div class="k">Birthday</div><div class="v">${p.birthday?humanDate(p.birthday):'—'}</div></div>
+    ${p.area==='friend'?`<div class="k-v"><div class="k">Last talked</div><div class="v">${p.lastTalked?humanDate(p.lastTalked):'Unknown'}</div></div>`:''}
+    <div class="k-v"><div class="k">Phone</div><div class="v">${esc(p.phone)||'—'}</div></div>
+  </div>`;
+  if(p.area==='friend'){
+    const days = p.lastTalked ? daysBetween(p.lastTalked, todayStr()) : null;
+    if(days!==null && days>=21){
+      html += `<div class="suggest-box"><strong>Haven't talked in ${days} days</strong>Want to reconnect?</div>
+      <div class="swipe-actions">
+        <button class="btn btn-secondary btn-sm" onclick="People.markTalked('${p.id}')">Mark as talked today</button>
+        <button class="btn btn-secondary btn-sm" onclick="Capture.quickFollowUp('${p.id}','Reach out to ${esc(p.name)}')">Set reminder</button>
+      </div>`;
+    }
+  }
+  if(p.notes){
+    html += `<div class="section-title">Notes</div><div class="card">${nl2br(p.notes)}</div>`;
+  }
+  if(p.likes && p.likes.length){}
+  html += `<div class="section-title">Likes &amp; notes</div>
+  <div class="card">
+    ${(p.preferences&&p.preferences.likes&&p.preferences.likes.length)?`<div class="item-sub" style="margin-bottom:8px;"><strong style="color:var(--text)">Likes:</strong> ${p.preferences.likes.map(esc).join(', ')}</div>`:''}
+    <button class="btn btn-secondary btn-sm" onclick="People.quickNote('${p.id}')">+ Add a note</button>
+  </div>`;
+  return html;
+}
+
+function personPreferences(p){
+  const pr = p.preferences||{likes:[],dislikes:[],placesToVisit:[],thingsToBuy:[]};
+  const chipList = (arr,label,field)=> `
+    <div class="section-title">${label}</div>
+    <div class="chip-row" style="margin-bottom:6px;">
+      ${(arr||[]).map((v,i)=>`<span class="chip" style="cursor:default;">${esc(v)} <span onclick="People.removePref('${p.id}','${field}',${i})" style="margin-left:2px;cursor:pointer;opacity:.6;">✕</span></span>`).join("")}
+      <button class="chip" onclick="People.addPref('${p.id}','${field}','${label}')">+ Add</button>
+    </div>`;
+  return `
+    <div class="card">
+      <label>Favorite food</label>
+      <input type="text" value="${esc(pr.favFood)}" onchange="People.setPrefField('${p.id}','favFood',this.value)" placeholder="e.g. Butter chicken">
+      <label>Favorite color</label>
+      <input type="text" value="${esc(pr.favColor)}" onchange="People.setPrefField('${p.id}','favColor',this.value)" placeholder="e.g. Sage green">
+    </div>
+    ${chipList(pr.likes,'Likes','likes')}
+    ${chipList(pr.dislikes,'Dislikes','dislikes')}
+    ${chipList(pr.placesToVisit,'Places she wants to visit','placesToVisit')}
+    ${chipList(pr.thingsToBuy,'Things she wants to buy','thingsToBuy')}
+  `;
+}
+
+function personBucketList(p){
+  const items = bucketFor(p.id);
+  let html = "";
+  if(!items.length) html += emptyState("🌤️","Nothing on the list yet","Add a someday-goal, a place to visit, or a plan.");
+  else html += `<div class="card">`+items.map(b=>`
+    <div class="list-item" onclick="BucketUI.edit('${b.id}')">
+      <div class="check-circle ${b.status==='done'?'done':''}" onclick="event.stopPropagation(); BucketUI.toggle('${b.id}')">${icon('check')}</div>
+      <div style="flex:1;"><div class="item-title" style="${b.status==='done'?'text-decoration:line-through;color:var(--text-muted);':''}">${esc(b.title)}</div>
+      <div class="item-sub">${esc(b.timeline)}${b.targetDate?' · '+humanDate(b.targetDate):''}</div></div>
+    </div>`).join("")+`</div>`;
+  html += `<button class="btn btn-secondary btn-block" onclick="BucketUI.add('${p.id}')">+ Add to bucket list</button>`;
+  return html;
+}
+
+function renderPersonTimeline(p){
+  const entries = timelineForPerson(p.id);
+  if(!entries.length) return emptyState("📖","Timeline is empty","Capture something worth remembering.");
+  return groupedTimeline(entries);
+}
+function groupedTimeline(entries){
+  const groups = [];
+  entries.forEach(e=>{
+    const label = dayGroupLabel(e.timestamp);
+    let g = groups.find(x=>x.label===label);
+    if(!g){ g={label,items:[]}; groups.push(g); }
+    g.items.push(e);
+  });
+  return groups.map(g=>`
+    <div class="timeline-day">
+      <div class="timeline-date">${g.label}</div>
+      ${g.items.map(e=>`
+        <div class="timeline-entry">
+          <div class="timeline-time">${humanTimestamp(e.timestamp).split('·').pop().trim()}</div>
+          <div style="flex:1;">
+            <div class="item-title" style="font-size:14px; font-weight:500;">${esc(e.text)}</div>
+            <div class="item-meta">${esc(e.category)}${route.screen==='timeline'?' · '+personLabel(e.personId):''}</div>
+          </div>
+        </div>`).join("")}
+    </div>`).join("");
+}
+
+function personHealth(p){
+  const issues = healthFor(p.id).filter(h=>h.type==="issue");
+  const meds = healthFor(p.id).filter(h=>h.type==="medicine");
+  const visits = healthFor(p.id).filter(h=>h.type==="visit");
+  return `
+    <div class="privacy-note">${icon('shield')} Remainder only stores and reminds — it does not give medical advice.</div>
+    <div class="section-title">Health notes</div>
+    <div class="card">${issues.length?issues.map(h=>`<div class="k-v"><div class="k">${esc(h.issue)}</div><div class="v" style="font-weight:400;color:var(--text-muted);">${esc(h.notes)}</div></div>`).join(""):'<div class="item-sub">None recorded.</div>'}</div>
+    <button class="btn btn-secondary btn-sm" onclick="HealthUI.add('${p.id}','issue')">+ Add health note</button>
+    <div class="section-title">Medicines</div>
+    <div class="card">${meds.length?meds.map(h=>`<div class="k-v"><div class="k">${esc(h.medicineName)}</div><div class="v" style="font-weight:400;color:var(--text-muted);">${esc(h.dosage)} · ${esc(h.frequency)}</div></div>`).join(""):'<div class="item-sub">None recorded.</div>'}</div>
+    <button class="btn btn-secondary btn-sm" onclick="HealthUI.add('${p.id}','medicine')">+ Add medicine</button>
+    <div class="section-title">Doctor visits</div>
+    <div class="card">${visits.length?visits.map(h=>`<div class="k-v"><div class="k">${esc(h.doctor)}</div><div class="v" style="font-weight:400;color:var(--text-muted);">${h.visitDate?humanDate(h.visitDate):''}${h.nextVisit?' · next '+humanDate(h.nextVisit):''}</div></div>`).join(""):'<div class="item-sub">None recorded.</div>'}</div>
+    <button class="btn btn-secondary btn-sm" onclick="HealthUI.add('${p.id}','visit')">+ Add doctor visit</button>
+    <div class="section-title">Call reminders</div>
+    ${remindersCard(activeReminders().filter(r=>r.personId===p.id))}
+    <button class="btn btn-secondary btn-sm" onclick="ReminderUI.add('${p.id}')">+ Add call reminder</button>
+  `;
+}
+
+function remindersCard(list){
+  if(!list.length) return `<div class="card"><div class="item-sub">Nothing scheduled.</div></div>`;
+  return `<div class="card">`+list.map(r=>`
+    <div class="list-item" onclick="ItemActions.open('reminder','${r.id}')">
+      <div class="check-circle" onclick="event.stopPropagation();ItemActions.quickComplete('reminder','${r.id}')">${icon('check')}</div>
+      <div style="flex:1;"><div class="row-between"><div class="item-title">${esc(r.title)}</div>${priorityBadge(r.priority)}</div>
+      <div class="item-sub">${humanDate(r.dueDate,r.dueTime)}${r.repeatType!=='none'?' · repeats':''}</div></div>
+    </div>`).join("")+`</div>`;
+}
+function followUpsCard(list){
+  if(!list.length) return `<div class="card"><div class="item-sub">Nothing pending.</div></div>`;
+  return `<div class="card">`+list.map(f=>`
+    <div class="list-item" onclick="ItemActions.open('followup','${f.id}')">
+      <div class="check-circle" onclick="event.stopPropagation();ItemActions.quickComplete('followup','${f.id}')">${icon('check')}</div>
+      <div style="flex:1;"><div class="item-title">${esc(f.text)}</div>
+      <div class="item-sub">${f.dueDate?humanDate(f.dueDate):'No date'}</div></div>
+    </div>`).join("")+`</div>`;
+}
+function personReminders(p){
+  return `<div class="section-title">Reminders</div>${remindersCard(activeReminders().filter(r=>r.personId===p.id))}
+  <button class="btn btn-secondary btn-sm" onclick="ReminderUI.add('${p.id}')">+ Add reminder</button>`;
+}
+function personFollowUps(p){
+  return `<div class="section-title">Follow-ups</div>${followUpsCard(activeFollowUps().filter(f=>f.personId===p.id))}
+  <button class="btn btn-secondary btn-sm" onclick="Capture.quickFollowUp('${p.id}','')">+ Add follow-up</button>`;
+}
+
+/* -------- Buvan screen -------- */
+function renderBuvan(){
+  const tab = route.params.tab || "daily";
+  const tabs = [ {key:"daily",label:"Daily"}, {key:"bucket",label:"Bucket List"}, {key:"projects",label:"Projects"} ];
+  let body = "";
+  if(tab==="daily") body = buvanDaily();
+  if(tab==="bucket") body = buvanBucket();
+  if(tab==="projects") body = buvanProjects();
+  return `
+    <div class="profile-tabs">${tabs.map(t=>`<button class="profile-tab ${tab===t.key?'active':''}" onclick="UI.nav('buvan',{tab:'${t.key}'})">${t.label}</button>`).join("")}</div>
+    ${body}
+  `;
+}
+function buvanDaily(){
+  const rems = activeReminders().filter(r=>r.personId==="buvan"||!r.personId);
+  return `<div class="section-title">Reminders &amp; routines</div>${remindersCard(rems)}
+  <button class="btn btn-secondary btn-sm" onclick="ReminderUI.add('buvan')">+ Add reminder</button>`;
+}
+function buvanBucket(){ return personBucketList({ id:"buvan" }); }
+function buvanProjects(){
+  const list = state.projects;
+  if(!list.length) return emptyState("🧭","No projects yet","Track a passport renewal, a document, or any personal project.") + addProjectBtn();
+  return list.map(p=>`
+    <div class="card card-tap" onclick="ProjectUI.open('${p.id}')">
+      <div class="row-between"><div class="item-title">${esc(p.title)}${p.isDemo?' <span class="badge badge-demo">Demo</span>':''}</div><span class="badge badge-normal">${esc(p.status)}</span></div>
+      ${p.nextAction?`<div class="item-sub" style="margin-top:6px;"><strong style="color:var(--accent)">Next:</strong> ${esc(p.nextAction)}</div>`:''}
+      <div class="item-meta">${p.tasks.filter(t=>t.done).length}/${p.tasks.length} tasks done</div>
+    </div>`).join("") + addProjectBtn();
+}
+function addProjectBtn(){ return `<button class="btn btn-secondary btn-block" onclick="ProjectUI.add()">+ New project</button>`; }
+
+/* =========================================================================
+   RENDER: TIMELINE
+   ========================================================================= */
+function renderTimeline(){
+  const filter = route.params.filter || "all";
+  const areas = [ {k:"all",l:"All"}, {k:"buvan",l:state.settings.buvanName}, {k:"girlfriend",l:"Girlfriend"}, {k:"family",l:"Family"}, {k:"friend",l:"Friends"} ];
+  const items = globalTimeline(filter);
+  return `
+    <div class="profile-tabs">${areas.map(a=>`<button class="profile-tab ${filter===a.k?'active':''}" onclick="UI.nav('timeline',{filter:'${a.k}'})">${a.l}</button>`).join("")}</div>
+    ${items.length? groupedTimeline(items) : emptyState("📖","No history yet","As you capture memories and complete things, they'll show up here.")}
+  `;
+}
+
+/* =========================================================================
+   RENDER: SEARCH
+   ========================================================================= */
+function renderSearch(){
+  return `
+    <input type="text" id="searchInput" placeholder="Search people, memories, reminders…" oninput="SearchUI.onInput(this.value)" style="margin-bottom:16px;" autofocus>
+    <div id="searchResults">${emptyState("🔎","Search everything","Find people, memories, reminders, follow-ups, projects, and more — instantly.")}</div>
+  `;
+}
+const SearchUI = {
+  onInput(v){
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(()=>{
+      const results = searchEverything(v);
+      const el = document.getElementById("searchResults");
+      if(!el) return;
+      if(!v.trim()){ el.innerHTML = emptyState("🔎","Search everything","Find people, memories, reminders, follow-ups, projects, and more — instantly."); return; }
+      if(!results.length){ el.innerHTML = emptyState("🌾","No results","Try a different word."); return; }
+      el.innerHTML = `<div class="card">`+results.slice(0,60).map(r=>`
+        <div class="list-item" onclick="${r.personId?`UI.nav('person',{id:'${r.personId}'})`:''}">
+          <div style="flex:1;"><div class="row-between"><div class="item-title">${esc(r.title)}</div><span class="badge badge-accent">${esc(r.kind)}</span></div>
+          <div class="item-sub">${esc(r.sub)}${r.date?' · '+esc(r.date):''}</div></div>
+        </div>`).join("")+`</div>`;
+    },150);
+  }
+};
+
+/* =========================================================================
+   RENDER: MORE / SETTINGS
+   ========================================================================= */
+function renderMore(){
+  return `
+    <div class="card" style="padding:0;">
+      ${moreRow('settings','Settings','Theme, notifications, about')}
+      ${moreRow('period-tracker','Period Tracker','Cycle predictions & PMS reminders')}
+    </div>
+    <div class="card" style="padding:0;">
+      ${moreRow('export','Export My Data','Save a backup as JSON')}
+      ${moreRow('import','Restore Backup','Load data from a JSON file')}
+      ${moreRow('demo','Load Demo Data','See Remainder with example content')}
+      ${moreRow('reset','Reset All Data','Erase everything on this device', true)}
+    </div>
+    <div class="privacy-note">${icon('shield')} Private by design. Remainder stores your information locally on this device and never sends it to a server.</div>
+    <input type="file" id="importFile" accept="application/json" style="display:none" onchange="MoreUI.onImportFile(this.files[0])">
+  `;
+}
+function moreRow(action,title,sub,danger){
+  return `<div class="list-item" onclick="MoreUI.act('${action}')">
+    <div style="flex:1;"><div class="item-title" style="${danger?'color:var(--danger);':''}">${title}</div><div class="item-sub">${sub}</div></div>
+  </div>`;
+}
+const MoreUI = {
+  act(a){
+    if(a==="settings") return UI.nav("settings");
+    if(a==="period-tracker") return UI.nav("period",{ backTo:"more" });
+    if(a==="export") return exportData();
+    if(a==="import") return document.getElementById("importFile").click();
+    if(a==="demo") return loadDemoData();
+    if(a==="reset") return resetAllData();
+  },
+  onImportFile(file){ if(file) importDataFromFile(file); }
+};
+
+function renderSettings(){
+  const s = state.settings;
+  const permLabel = { granted:"Enabled", denied:"Blocked in browser settings", default:"Not requested yet", unsupported:"Not supported by this browser" }[state.notifications.permission] || "Not requested yet";
+  return `
+    <div class="section-title">Appearance</div>
+    <div class="card"><div class="pill-toggle">
+      <button class="${s.theme==='light'?'active':''}" onclick="setTheme('light')">Light</button>
+      <button class="${s.theme==='dark'?'active':''}" onclick="setTheme('dark')">Dark</button>
+      <button class="${s.theme==='system'?'active':''}" onclick="setTheme('system')">System</button>
+    </div></div>
+    <div class="section-title">Notifications</div>
+    <div class="card">
+      <div class="k-v"><div class="k">Status</div><div class="v">${permLabel}</div></div>
+      ${state.notifications.permission!=='granted'?`<button class="btn btn-primary btn-sm" style="margin-top:10px;" onclick="requestNotifPermission(); setTimeout(UI.render,300)">Enable notifications</button>`:''}
+    </div>
+    <div class="section-title">About</div>
+    <div class="card">
+      <div class="k-v"><div class="k">Remainder</div><div class="v">v${APP_VERSION}.0</div></div>
+      <div class="k-v"><div class="k">Data storage</div><div class="v">${memoryFallback?'In-memory only':'This device'}</div></div>
+    </div>
+    <div class="privacy-note">${icon('shield')} Remainder stores your information locally on this device and does not send your personal data to a server.</div>
+  `;
+}
+
+/* =========================================================================
+   PERIOD TRACKER SCREEN
+   ========================================================================= */
+function renderPeriodTracker(){
+  const gf = girlfriend();
+  const pred = periodPredictions();
+  let html = `<div class="privacy-note">${icon('shield')} Predictions are estimates based on the dates you enter and are not medical advice.</div>`;
+  if(!gf){
+    html += emptyState("💚","Add a girlfriend profile first","Period tracking connects to that profile.");
+    return html;
+  }
+  if(pred){
+    html += `<div class="card">
+      <div class="k-v"><div class="k">Last period</div><div class="v">${humanDate(pred.lastStart)}</div></div>
+      <div class="k-v"><div class="k">Cycle day</div><div class="v">Day ${pred.currentDay}</div></div>
+      <div class="k-v"><div class="k">Predicted next period</div><div class="v">${humanDate(pred.nextPeriod)}</div></div>
+      <div class="k-v"><div class="k">Days remaining</div><div class="v">${pred.daysRemaining}</div></div>
+      <div class="k-v"><div class="k">Predicted PMS start</div><div class="v">${humanDate(pred.pmsStart)}</div></div>
+    </div>`;
+    if(pred.inPmsWindow){
+      html += `<div class="suggest-box"><strong>PMS window may have started</strong>${state.settings.pmsChecklist.map(c=>'• '+esc(c)).join('<br>')}</div>`;
+    }
+  } else {
+    html += emptyState("🗓️","No cycles logged yet","Add the start date of the last cycle to begin predicting.");
+  }
+  html += `<button class="btn btn-secondary btn-block" onclick="PeriodUI.addCycle()">+ Log period start date</button>`;
+  html += `<div class="section-title">Settings</div><div class="card">
+    <label>Cycle length (days)</label>
+    <input type="number" min="15" max="60" value="${state.settings.cycleLength}" onchange="PeriodUI.setCycleLength(this.value)">
+    <label>PMS starts (days before period)</label>
+    <input type="number" min="0" max="20" value="${state.settings.pmsOffset}" onchange="PeriodUI.setPmsOffset(this.value)">
+  </div>`;
+  if(state.cycles.length){
+    html += `<div class="section-title">History</div><div class="card">`+state.cycles.slice().reverse().map(c=>`
+      <div class="k-v"><div class="k">${humanDate(c.startDate)}</div><div class="v"><button class="btn btn-ghost btn-sm" onclick="PeriodUI.deleteCycle('${c.id}')">Remove</button></div></div>`).join("")+`</div>`;
+  }
+  return html;
+}
+const PeriodUI = {
+  addCycle(){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Log period start</div>
+      <label>Start date</label>
+      <input type="date" id="cycleDate" value="${todayStr()}">
+      <button class="btn btn-primary btn-block" style="margin-top:18px;" onclick="PeriodUI.saveCycle()">Save</button>
+    `);
+  },
+  saveCycle(){ const v = document.getElementById("cycleDate").value; if(!v) return; addCycleEntry(v); UI.closeSheet(); UI.render(); showToast("Cycle logged"); },
+  deleteCycle(id){ deleteCycleEntry(id); UI.render(); },
+  setCycleLength(v){ state.settings.cycleLength = Math.max(15,Math.min(60,parseInt(v)||28)); saveState(); UI.render(); },
+  setPmsOffset(v){ state.settings.pmsOffset = Math.max(0,Math.min(20,parseInt(v)||5)); saveState(); UI.render(); }
+};
+
+/* =========================================================================
+   ITEM ACTIONS (reminders / follow-ups open sheet)
+   ========================================================================= */
+const ItemActions = {
+  open(type,id){
+    if(type==="reminder") return ReminderUI.open(id);
+    if(type==="followup") return FollowUpUI.open(id);
+  },
+  quickComplete(type,id){
+    if(type==="reminder") ItemActions.completeReminderFlow(id);
+    if(type==="followup") ItemActions.completeFollowUpFlow(id);
+  },
+  completeReminderFlow(id){
+    const r = state.reminders.find(x=>x.id===id); if(!r) return;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${esc(r.title)}</div>
+      <div class="sheet-sub">Mark this reminder as done. You can optionally save a memory about it.</div>
+      <label>Add a memory (optional)</label>
+      <textarea id="doneMemoryText" placeholder="e.g. Mom said her appointment went well."></textarea>
+      <div class="row" style="margin-top:16px; gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="ItemActions.finishReminder('${id}',false)">Done</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="ItemActions.finishReminder('${id}',true)">Done + Add Memory</button>
+      </div>
+    `);
+  },
+  finishReminder(id,withMemory){
+    const text = withMemory ? document.getElementById("doneMemoryText").value.trim() : "";
+    completeReminder(id, { addMemoryText: text||null });
+    UI.closeSheet(); UI.render(); showToast("Reminder completed");
+  },
+  completeFollowUpFlow(id){
+    const f = state.followUps.find(x=>x.id===id); if(!f) return;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${esc(f.text)}</div>
+      <div class="sheet-sub">Mark this follow-up as done.</div>
+      <label>Add a memory (optional)</label>
+      <textarea id="doneMemoryText2" placeholder="What happened?"></textarea>
+      <div class="row" style="margin-top:16px; gap:10px;">
+        <button class="btn btn-secondary" style="flex:1;" onclick="ItemActions.finishFollowUp('${id}',false)">Done</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="ItemActions.finishFollowUp('${id}',true)">Done + Add Memory</button>
+      </div>
+    `);
+  },
+  finishFollowUp(id,withMemory){
+    const text = withMemory ? document.getElementById("doneMemoryText2").value.trim() : "";
+    completeFollowUp(id, { addMemoryText: text||null });
+    UI.closeSheet(); UI.render(); showToast("Follow-up completed");
+  }
+};
+
+const ReminderUI = {
+  add(personId){ ReminderUI.form(null, personId); },
+  open(id){ ReminderUI.form(id); },
+  form(id, presetPerson){
+    const r = id ? state.reminders.find(x=>x.id===id) : null;
+    const personId = r ? r.personId : (presetPerson||"");
+    const peopleOptions = allPeopleOptions(personId);
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${r?"Edit reminder":"New reminder"}</div>
+      <label>Title</label>
+      <input type="text" id="remTitle" value="${r?esc(r.title):''}" placeholder="e.g. Call Mom">
+      <label>Notes</label>
+      <textarea id="remDesc" placeholder="Optional details">${r?esc(r.description):''}</textarea>
+      <label>Who is this for?</label>
+      <select id="remPerson">${peopleOptions}</select>
+      <div class="row" style="gap:10px;">
+        <div style="flex:1;"><label>Date</label><input type="date" id="remDate" value="${r?r.dueDate:todayStr()}"></div>
+        <div style="flex:1;"><label>Time</label><input type="time" id="remTime" value="${r?r.dueTime:''}"></div>
+      </div>
+      <label>Repeats</label>
+      <select id="remRepeat" onchange="ReminderUI.toggleCustom(this.value)">
+        ${['none','daily','weekly','monthly','custom-days','custom-weeks','custom-months'].map(v=>`<option value="${v}" ${r&&r.repeatType===v?'selected':''}>${repeatLabel(v)}</option>`).join("")}
+      </select>
+      <div id="customIntervalWrap" style="display:${r&&r.repeatType&&r.repeatType.startsWith('custom')?'block':'none'};">
+        <label>Every</label>
+        <input type="number" id="remInterval" min="1" value="${r?r.repeatInterval:1}">
+      </div>
+      <label>Priority</label>
+      <div class="chip-row" id="remPriority">
+        ${['Low','Normal','Important','Critical'].map(p=>`<button type="button" class="chip ${(r?r.priority:'Normal')===p?'selected':''}" onclick="ReminderUI.selectChip('remPriority',this)" data-val="${p}">${p}</button>`).join("")}
+      </div>
+      <div class="row" style="margin-top:18px; gap:10px;">
+        ${r?`<button class="btn btn-danger" onclick="ReminderUI.remove('${r.id}')">Delete</button>`:''}
+        <button class="btn btn-primary" style="flex:1;" onclick="ReminderUI.save('${r?r.id:''}')">Save</button>
+      </div>
+    `);
+  },
+  toggleCustom(v){ document.getElementById("customIntervalWrap").style.display = v.startsWith("custom")?"block":"none"; },
+  selectChip(groupId, el){ document.querySelectorAll('#'+groupId+' .chip').forEach(c=>c.classList.remove('selected')); el.classList.add('selected'); },
+  save(id){
+    const title = document.getElementById("remTitle").value.trim();
+    if(!title){ showToast("Add a title first"); return; }
+    const obj = {
+      title, description: document.getElementById("remDesc").value.trim(),
+      personId: document.getElementById("remPerson").value,
+      dueDate: document.getElementById("remDate").value,
+      dueTime: document.getElementById("remTime").value,
+      repeatType: document.getElementById("remRepeat").value,
+      repeatInterval: parseInt(document.getElementById("remInterval")?.value)||1,
+      priority: document.querySelector("#remPriority .chip.selected")?.dataset.val || "Normal"
+    };
+    if(id) updateReminder(id, obj); else addReminder(obj);
+    UI.closeSheet(); UI.render(); showToast("Reminder saved");
+  },
+  remove(id){ state.reminders = state.reminders.filter(r=>r.id!==id); saveState(); UI.closeSheet(); UI.render(); }
+};
+function repeatLabel(v){ return { none:"Doesn't repeat", daily:"Daily", weekly:"Weekly", monthly:"Monthly", "custom-days":"Every X days", "custom-weeks":"Every X weeks", "custom-months":"Every X months" }[v]; }
+function allPeopleOptions(selected){
+  let opts = `<option value="buvan" ${selected==='buvan'?'selected':''}>${esc(state.settings.buvanName)}</option>`;
+  const gf = girlfriend(); if(gf) opts += `<option value="${gf.id}" ${selected===gf.id?'selected':''}>${esc(gf.name)}</option>`;
+  peopleByArea("family").forEach(p=> opts += `<option value="${p.id}" ${selected===p.id?'selected':''}>${esc(p.name)}</option>` );
+  peopleByArea("friend").forEach(p=> opts += `<option value="${p.id}" ${selected===p.id?'selected':''}>${esc(p.name)}</option>` );
+  return opts;
+}
+
+const FollowUpUI = {
+  open(id){
+    const f = state.followUps.find(x=>x.id===id); if(!f) return;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Follow-up</div>
+      <label>What do you want to check?</label>
+      <textarea id="fuText">${esc(f.text)}</textarea>
+      <label>Due date</label>
+      <input type="date" id="fuDate" value="${f.dueDate||''}">
+      <div class="row" style="margin-top:18px; gap:10px;">
+        <button class="btn btn-danger" onclick="FollowUpUI.remove('${f.id}')">Delete</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="FollowUpUI.save('${f.id}')">Save</button>
+      </div>
+    `);
+  },
+  save(id){
+    const f = state.followUps.find(x=>x.id===id); if(!f) return;
+    f.text = document.getElementById("fuText").value.trim();
+    f.dueDate = document.getElementById("fuDate").value;
+    saveState(); UI.closeSheet(); UI.render(); showToast("Follow-up saved");
+  },
+  remove(id){ state.followUps = state.followUps.filter(f=>f.id!==id); saveState(); UI.closeSheet(); UI.render(); }
+};
+
+const BucketUI = {
+  add(personId){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add to bucket list</div>
+      <label>Title</label><input type="text" id="bTitle" placeholder="e.g. Visit Goa">
+      <label>Description</label><textarea id="bDesc" placeholder="Optional"></textarea>
+      <label>Timeline</label>
+      <select id="bTimeline">${['Someday','This month','Next month','Specific month','Specific year','No deadline'].map(t=>`<option>${t}</option>`).join("")}</select>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="BucketUI.save(null,'${personId}')">Save</button>
+    `);
+  },
+  edit(id){
+    const b = state.bucketList.find(x=>x.id===id); if(!b) return;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Edit bucket item</div>
+      <label>Title</label><input type="text" id="bTitle" value="${esc(b.title)}">
+      <label>Description</label><textarea id="bDesc">${esc(b.description)}</textarea>
+      <label>Timeline</label>
+      <select id="bTimeline">${['Someday','This month','Next month','Specific month','Specific year','No deadline'].map(t=>`<option ${b.timeline===t?'selected':''}>${t}</option>`).join("")}</select>
+      <div class="row" style="margin-top:16px; gap:10px;">
+        <button class="btn btn-danger" onclick="BucketUI.remove('${b.id}')">Delete</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="BucketUI.save('${b.id}')">Save</button>
+      </div>
+    `);
+  },
+  save(id, personId){
+    const obj = { title:document.getElementById("bTitle").value.trim(), description:document.getElementById("bDesc").value.trim(), timeline:document.getElementById("bTimeline").value };
+    if(!obj.title){ showToast("Add a title"); return; }
+    if(id) updateBucketItem(id,obj); else addBucketItem(Object.assign(obj,{ personId }));
+    UI.closeSheet(); UI.render(); showToast("Saved");
+  },
+  toggle(id){ const b=state.bucketList.find(x=>x.id===id); if(!b) return; b.status = b.status==="done"?"open":"done"; saveState(); UI.render(); },
+  remove(id){ deleteBucketItem(id); UI.closeSheet(); UI.render(); }
+};
+
+const ProjectUI = {
+  add(){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">New project</div>
+      <label>Title</label><input type="text" id="pTitle" placeholder="e.g. Passport renewal">
+      <label>Description</label><textarea id="pDesc"></textarea>
+      <label>Next action</label><input type="text" id="pNext" placeholder="What should happen next?">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="ProjectUI.save()">Create</button>
+    `);
+  },
+  save(){
+    const title = document.getElementById("pTitle").value.trim();
+    if(!title){ showToast("Add a title"); return; }
+    addProject({ title, description:document.getElementById("pDesc").value.trim(), nextAction:document.getElementById("pNext").value.trim() });
+    UI.closeSheet(); UI.render(); showToast("Project created");
+  },
+  open(id){
+    const p = state.projects.find(x=>x.id===id); if(!p) return;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${esc(p.title)}</div>
+      <label>Next action</label>
+      <input type="text" id="pjNext" value="${esc(p.nextAction)}" onchange="ProjectUI.setNext('${p.id}',this.value)">
+      <label>Status</label>
+      <select onchange="ProjectUI.setStatus('${p.id}',this.value)">
+        ${['active','on hold','done'].map(s=>`<option ${p.status===s?'selected':''}>${s}</option>`).join("")}
+      </select>
+      <label>Tasks</label>
+      <div class="card">${p.tasks.length?p.tasks.map(t=>`
+        <div class="list-item" onclick="ProjectUI.toggleTask('${p.id}','${t.id}')">
+          <div class="check-circle ${t.done?'done':''}">${icon('check')}</div>
+          <div style="${t.done?'text-decoration:line-through;color:var(--text-muted);':''}">${esc(t.text)}</div>
+        </div>`).join(""):'<div class="item-sub">No tasks yet.</div>'}</div>
+      <div class="row" style="gap:8px; margin-top:8px;">
+        <input type="text" id="pjNewTask" placeholder="Add a task" style="flex:1;">
+        <button class="btn btn-secondary" onclick="ProjectUI.addTask('${p.id}')">Add</button>
+      </div>
+      <label>Notes</label>
+      <textarea onchange="ProjectUI.setNotes('${p.id}',this.value)">${esc(p.notes)}</textarea>
+      <button class="btn btn-danger btn-block" style="margin-top:14px;" onclick="ProjectUI.remove('${p.id}')">Delete project</button>
+    `);
+  },
+  setNext(id,v){ updateProject(id,{nextAction:v}); UI.render(); },
+  setStatus(id,v){ updateProject(id,{status:v}); UI.closeSheet(); UI.render(); },
+  setNotes(id,v){ updateProject(id,{notes:v}); },
+  addTask(id){ const v=document.getElementById("pjNewTask").value.trim(); if(!v) return; addProjectTask(id,v); ProjectUI.open(id); },
+  toggleTask(pid,tid){ toggleProjectTask(pid,tid); ProjectUI.open(pid); },
+  remove(id){ deleteProject(id); UI.closeSheet(); UI.render(); showToast("Project deleted"); }
+};
+
+const HealthUI = {
+  add(personId,type){
+    let fields = "";
+    if(type==="issue") fields = `<label>Issue</label><input type="text" id="hIssue" placeholder="e.g. Knee pain"><label>Notes</label><textarea id="hNotes"></textarea>`;
+    if(type==="medicine") fields = `<label>Medicine name</label><input type="text" id="hMed"><label>Dosage</label><input type="text" id="hDose" placeholder="e.g. 500mg"><label>Frequency</label><input type="text" id="hFreq" placeholder="e.g. Twice daily">`;
+    if(type==="visit") fields = `<label>Doctor</label><input type="text" id="hDoctor"><label>Reason</label><input type="text" id="hReason"><label>Visit date</label><input type="date" id="hDate" value="${todayStr()}"><label>Next visit</label><input type="date" id="hNext">`;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${type==='issue'?'Health note':type==='medicine'?'Add medicine':'Doctor visit'}</div>
+      ${fields}
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="HealthUI.save('${personId}','${type}')">Save</button>
+    `);
+  },
+  save(personId,type){
+    const obj = { personId, type };
+    if(type==="issue"){ obj.issue = document.getElementById("hIssue").value.trim(); obj.notes = document.getElementById("hNotes").value.trim(); if(!obj.issue){ showToast("Add an issue"); return; } }
+    if(type==="medicine"){ obj.medicineName = document.getElementById("hMed").value.trim(); obj.dosage=document.getElementById("hDose").value.trim(); obj.frequency=document.getElementById("hFreq").value.trim(); if(!obj.medicineName){ showToast("Add a medicine name"); return; } }
+    if(type==="visit"){ obj.doctor=document.getElementById("hDoctor").value.trim(); obj.reason=document.getElementById("hReason").value.trim(); obj.visitDate=document.getElementById("hDate").value; obj.nextVisit=document.getElementById("hNext").value; if(!obj.doctor){ showToast("Add a doctor name"); return; } }
+    addHealthRecord(obj);
+    UI.closeSheet(); UI.render(); showToast("Saved");
+  }
+};
+
+const People = {
+  addToArea(area){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add ${area==='family'?'family member':'friend'}</div>
+      <label>Name</label><input type="text" id="npName" placeholder="Name">
+      <label>Relationship</label><input type="text" id="npRel" placeholder="${area==='family'?'e.g. Mother':'e.g. College friend'}">
+      <label>Birthday</label><input type="date" id="npBday">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="People.saveNew('${area}')">Save</button>
+    `);
+  },
+  saveNew(area){
+    const name = document.getElementById("npName").value.trim();
+    if(!name){ showToast("Add a name"); return; }
+    const p = addPerson({ area, name, relationship:document.getElementById("npRel").value.trim(), birthday:document.getElementById("npBday").value });
+    UI.closeSheet(); navigate("person",{id:p.id}); showToast("Added "+name);
+  },
+  addGirlfriend(){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add girlfriend profile</div>
+      <label>Name</label><input type="text" id="gfName" placeholder="Name">
+      <label>Birthday</label><input type="date" id="gfBday">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="People.saveGirlfriend()">Save</button>
+    `);
+  },
+  saveGirlfriend(){
+    const name = document.getElementById("gfName").value.trim();
+    if(!name){ showToast("Add a name"); return; }
+    const p = addPerson({ area:"girlfriend", name, relationship:"Girlfriend", birthday:document.getElementById("gfBday").value,
+      preferences:{ likes:[],dislikes:[],favFood:"",favColor:"",placesToVisit:[],thingsToBuy:[],importantDates:[] } });
+    UI.closeSheet(); navigate("person",{id:p.id}); showToast("Added "+name);
+  },
+  editBasics(id){
+    const p = getPerson(id); if(!p) return;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Edit ${esc(p.name)}</div>
+      <label>Name</label><input type="text" id="epName" value="${esc(p.name)}">
+      <label>Relationship</label><input type="text" id="epRel" value="${esc(p.relationship)}">
+      <label>Birthday</label><input type="date" id="epBday" value="${p.birthday||''}">
+      <label>Phone</label><input type="tel" id="epPhone" value="${esc(p.phone)}">
+      <label>Notes</label><textarea id="epNotes">${esc(p.notes)}</textarea>
+      <div class="row" style="margin-top:16px; gap:10px;">
+        <button class="btn btn-danger" onclick="People.remove('${id}')">Delete</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="People.saveBasics('${id}')">Save</button>
+      </div>
+    `);
+  },
+  saveBasics(id){
+    updatePerson(id, { name:document.getElementById("epName").value.trim(), relationship:document.getElementById("epRel").value.trim(),
+      birthday:document.getElementById("epBday").value, phone:document.getElementById("epPhone").value.trim(), notes:document.getElementById("epNotes").value.trim() });
+    UI.closeSheet(); UI.render(); showToast("Saved");
+  },
+  remove(id){
+    UI.confirmDialog({ title:"Delete this person?", body:"This removes their profile. Memories and timeline entries stay but will show as unlinked.", confirmLabel:"Delete", danger:true,
+      onConfirm:()=>{ deletePerson(id); UI.closeSheet(); navigate("people"); } });
+  },
+  markTalked(id){ updatePerson(id,{lastTalked:todayStr()}); addTimelineEntry({personId:id,text:"Talked today",category:"General",timestamp:nowTimestamp()}); saveState(); UI.render(); showToast("Marked as talked"); },
+  quickNote(id){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add a note</div>
+      <textarea id="qNote" placeholder="What do you want to remember?"></textarea>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="People.saveQuickNote('${id}')">Save</button>
+    `);
+  },
+  saveQuickNote(id){
+    const v = document.getElementById("qNote").value.trim(); if(!v) return;
+    const p = getPerson(id);
+    p.notes = p.notes ? p.notes+"\n"+v : v;
+    saveState();
+    addTimelineEntry({personId:id,text:v,category:"Note",timestamp:nowTimestamp()});
+    UI.closeSheet(); UI.render(); showToast("Note saved");
+  },
+  addPref(id,field,label){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add to ${esc(label)}</div>
+      <input type="text" id="prefVal" placeholder="Type here">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="People.savePref('${id}','${field}')">Add</button>
+    `);
+  },
+  savePref(id,field){
+    const v = document.getElementById("prefVal").value.trim(); if(!v) return;
+    const p = getPerson(id); if(!p.preferences[field]) p.preferences[field]=[];
+    p.preferences[field].push(v); saveState();
+    UI.closeSheet(); UI.render();
+  },
+  removePref(id,field,idx){ const p=getPerson(id); p.preferences[field].splice(idx,1); saveState(); UI.render(); },
+  setPrefField(id,field,val){ const p=getPerson(id); p.preferences[field]=val; saveState(); }
+};
+
+/* =========================================================================
+   QUICK CAPTURE
+   ========================================================================= */
+const Capture = {
+  state:{ type:null, text:"", personId:"", category:"General", importance:"Normal" },
+  open(){
+    Capture.state = { type:null, text:"", personId:"", category:"General", importance:"Normal" };
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Quick capture</div>
+      <div class="sheet-sub">What would you like to remember?</div>
+      <div class="chip-row">
+        ${[["memory","Memory"],["reminder","Reminder"],["followup","Follow-up"],["person","Person update"],["task","Task / Project"]].map(([k,l])=>`<button class="chip" onclick="Capture.chooseType('${k}')">${l}</button>`).join("")}
+      </div>
+    `);
+  },
+  chooseType(type){
+    Capture.state.type = type;
+    const placeholder = type==="memory" ? '"She said her stomach hurts."' : type==="reminder" ? '"Call Mom tomorrow at 7 PM."' : type==="followup" ? '"Check passport application."' : type==="task" ? '"Book passport appointment."' : '"Loves filter coffee."';
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">${captureTitle(type)}</div>
+      <div class="row" style="align-items:flex-start; gap:10px;">
+        <textarea id="captureText" placeholder='${placeholder}' style="flex:1;" oninput="Capture.onTextInput(this.value)"></textarea>
+        <button class="mic-btn" id="micBtn" onclick="startVoice('captureText')" aria-label="Voice input">${icon('mic')}</button>
+      </div>
+      <div id="suggestArea"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:14px;" onclick="Capture.proceed()">Continue</button>
+    `);
+  },
+  onTextInput(v){
+    Capture.state.text = v;
+    const s = analyzeText(v);
+    const box = document.getElementById("suggestArea");
+    if(!box) return;
+    if(!v.trim() || (!s.suggestReminder && !s.suggestFollowUp && s.matched.length===0)){ box.innerHTML=""; return; }
+    const chips = [];
+    if(s.suggestReminder) chips.push("Create a reminder?");
+    if(s.suggestFollowUp) chips.push("Worth a follow-up?");
+    if(s.suggestedImportance!=="Normal") chips.push("Mark as "+s.suggestedImportance+"?");
+    box.innerHTML = `<div class="suggest-box"><strong>This sounds like it needs attention</strong>${chips.join(" · ")}</div>`;
+  },
+  proceed(){
+    const text = document.getElementById("captureText").value.trim();
+    if(!text){ showToast("Type or say something first"); return; }
+    Capture.state.text = text;
+    const type = Capture.state.type;
+    if(type==="memory") return Capture.memoryStep2();
+    if(type==="reminder") return Capture.reminderStep2();
+    if(type==="followup") return Capture.followupStep2();
+    if(type==="person") return Capture.personUpdateStep2();
+    if(type==="task") return Capture.taskStep2();
+  },
+  personChips(selected){
+    const opts = [["buvan",state.settings.buvanName]];
+    const gf = girlfriend(); if(gf) opts.push([gf.id,gf.name]);
+    peopleByArea("family").forEach(p=>opts.push([p.id,p.name]));
+    peopleByArea("friend").forEach(p=>opts.push([p.id,p.name]));
+    return `<div class="chip-row" id="capPersonChips">${opts.map(([id,name])=>`<button type="button" class="chip ${selected===id?'selected':''}" data-val="${id}" onclick="ReminderUI.selectChip('capPersonChips',this)">${esc(name)}</button>`).join("")}</div>`;
+  },
+  memoryStep2(){
+    const s = analyzeText(Capture.state.text);
+    let suggestedPerson = "buvan";
+    if(s.suggestedArea==="girlfriend" && girlfriend()) suggestedPerson = girlfriend().id;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Who is this about?</div>
+      ${Capture.personChips(suggestedPerson)}
+      <label>Category</label>
+      <div class="chip-row" id="capCategory">${["General","Health","Preference","Plan","Event"].map(c=>`<button type="button" class="chip ${c===s.suggestedCategory?'selected':''}" data-val="${c}" onclick="ReminderUI.selectChip('capCategory',this)">${c}</button>`).join("")}</div>
+      <label>Importance</label>
+      <div class="chip-row" id="capImportance">${["Normal","Important","Critical"].map(c=>`<button type="button" class="chip ${c===s.suggestedImportance?'selected':''}" data-val="${c}" onclick="ReminderUI.selectChip('capImportance',this)">${c}</button>`).join("")}</div>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="Capture.saveMemory()">Save memory</button>
+    `);
+  },
+  saveMemory(){
+    const personId = document.querySelector("#capPersonChips .chip.selected")?.dataset.val || "buvan";
+    const category = document.querySelector("#capCategory .chip.selected")?.dataset.val || "General";
+    const importance = document.querySelector("#capImportance .chip.selected")?.dataset.val || "Normal";
+    const m = addMemory({ personId, text:Capture.state.text, category, importance });
+    Capture.memoryId = m.id;
+    Capture.memoryPersonId = personId;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Would you like to follow up?</div>
+      <div class="chip-row">
+        <button class="chip" onclick="Capture.followUpFromMemory('1h')">1 hour</button>
+        <button class="chip" onclick="Capture.followUpFromMemory('evening')">This evening</button>
+        <button class="chip" onclick="Capture.followUpFromMemory('tomorrow')">Tomorrow</button>
+        <button class="chip" onclick="Capture.followUpFromMemory('custom')">Custom</button>
+        <button class="chip" onclick="Capture.followUpFromMemory('none')">No follow-up</button>
+      </div>
+    `);
+  },
+  followUpFromMemory(choice){
+    if(choice==="none"){ UI.closeSheet(); UI.render(); showToast("Memory saved"); return; }
+    if(choice==="custom"){
+      UI.openSheet(`<div class="sheet-handle"></div><div class="sheet-title">Custom follow-up date</div>
+      <input type="date" id="capCustomDate" value="${addDays(todayStr(),2)}">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="Capture.saveFollowUp(document.getElementById('capCustomDate').value)">Save</button>`);
+      return;
+    }
+    let due = todayStr();
+    if(choice==="tomorrow") due = addDays(todayStr(),1);
+    Capture.saveFollowUp(due);
+  },
+  saveFollowUp(due){
+    addFollowUp({ personId:Capture.memoryPersonId, text:"Check on: "+Capture.state.text, dueDate:due, linkedMemoryId:Capture.memoryId });
+    UI.closeSheet(); UI.render(); showToast("Follow-up created");
+  },
+  reminderStep2(){
+    const s = analyzeText(Capture.state.text);
+    let suggestedPerson = "buvan";
+    if(s.suggestedArea==="girlfriend" && girlfriend()) suggestedPerson = girlfriend().id;
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Set up reminder</div>
+      ${Capture.personChips(suggestedPerson)}
+      <div class="row" style="gap:10px;">
+        <div style="flex:1;"><label>Date</label><input type="date" id="capDate" value="${addDays(todayStr(),1)}"></div>
+        <div style="flex:1;"><label>Time</label><input type="time" id="capTime"></div>
+      </div>
+      <label>Repeats</label>
+      <select id="capRepeat">${['none','daily','weekly','monthly'].map(v=>`<option value="${v}">${repeatLabel(v)}</option>`).join("")}</select>
+      <label>Priority</label>
+      <div class="chip-row" id="capPriority">${["Normal","Important","Critical"].map(c=>`<button type="button" class="chip ${c===s.suggestedImportance?'selected':''}" data-val="${c}" onclick="ReminderUI.selectChip('capPriority',this)">${c}</button>`).join("")}</div>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="Capture.saveReminder()">Create reminder</button>
+    `);
+  },
+  saveReminder(){
+    const personId = document.querySelector("#capPersonChips .chip.selected")?.dataset.val || "buvan";
+    addReminder({ title:Capture.state.text, personId,
+      dueDate:document.getElementById("capDate").value, dueTime:document.getElementById("capTime").value,
+      repeatType:document.getElementById("capRepeat").value,
+      priority: document.querySelector("#capPriority .chip.selected")?.dataset.val || "Normal" });
+    UI.closeSheet(); UI.render(); showToast("Reminder created");
+  },
+  followupStep2(){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">When should I follow up?</div>
+      ${Capture.personChips("buvan")}
+      <div class="chip-row" style="margin-top:12px;">
+        <button class="chip" onclick="Capture.saveFollowUpDirect('1h')">1 hour</button>
+        <button class="chip" onclick="Capture.saveFollowUpDirect('evening')">This evening</button>
+        <button class="chip" onclick="Capture.saveFollowUpDirect('tomorrow')">Tomorrow</button>
+        <button class="chip" onclick="Capture.saveFollowUpDirect('custom')">Custom</button>
+      </div>
+    `);
+  },
+  saveFollowUpDirect(choice){
+    const personId = document.querySelector("#capPersonChips .chip.selected")?.dataset.val || "buvan";
+    if(choice==="custom"){
+      UI.openSheet(`<div class="sheet-handle"></div><div class="sheet-title">Custom date</div>
+      <input type="date" id="capCustomDate2" value="${addDays(todayStr(),2)}">
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="Capture.finishFollowUpDirect('${personId}',document.getElementById('capCustomDate2').value)">Save</button>`);
+      return;
+    }
+    let due = todayStr();
+    if(choice==="tomorrow") due = addDays(todayStr(),1);
+    Capture.finishFollowUpDirect(personId,due);
+  },
+  finishFollowUpDirect(personId,due){
+    addFollowUp({ personId, text:Capture.state.text, dueDate:due });
+    UI.closeSheet(); UI.render(); showToast("Follow-up created");
+  },
+  quickFollowUp(personId,text){
+    Capture.state = { type:"followup", text: text||"" };
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Follow-up</div>
+      <textarea id="captureText" placeholder="What do you want to check?">${esc(text||"")}</textarea>
+      <div class="chip-row" style="margin-top:12px;">
+        <button class="chip" onclick="Capture.state.text=document.getElementById('captureText').value; Capture.finishFollowUpDirect('${personId}',addDays(todayStr(),0))">Today</button>
+        <button class="chip" onclick="Capture.state.text=document.getElementById('captureText').value; Capture.finishFollowUpDirect('${personId}',addDays(todayStr(),1))">Tomorrow</button>
+      </div>
+    `);
+  },
+  personUpdateStep2(){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Who is this about?</div>
+      ${Capture.personChips("buvan")}
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="Capture.savePersonUpdate()">Save as note</button>
+    `);
+  },
+  savePersonUpdate(){
+    const personId = document.querySelector("#capPersonChips .chip.selected")?.dataset.val || "buvan";
+    if(personId==="buvan"){
+      addTimelineEntry({personId:"buvan",text:Capture.state.text,category:"Note",timestamp:nowTimestamp()});
+    } else {
+      const p = getPerson(personId);
+      p.notes = p.notes ? p.notes+"\n"+Capture.state.text : Capture.state.text;
+      saveState();
+      addTimelineEntry({personId,text:Capture.state.text,category:"Note",timestamp:nowTimestamp()});
+    }
+    UI.closeSheet(); UI.render(); showToast("Saved");
+  },
+  taskStep2(){
+    UI.openSheet(`
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Add to</div>
+      <div class="chip-row" id="capTaskDest">
+        <button type="button" class="chip selected" data-val="bucket" onclick="ReminderUI.selectChip('capTaskDest',this)">Bucket list</button>
+        <button type="button" class="chip" data-val="project" onclick="ReminderUI.selectChip('capTaskDest',this)">Existing project</button>
+      </div>
+      <div id="taskDestBody">${state.projects.length?`<select id="capProjectSelect">${state.projects.map(p=>`<option value="${p.id}">${esc(p.title)}</option>`).join("")}</select>`:'<div class="item-sub" style="margin-top:8px;">No projects yet — this will go to the bucket list.</div>'}</div>
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="Capture.saveTask()">Save</button>
+    `);
+  },
+  saveTask(){
+    const dest = document.querySelector("#capTaskDest .chip.selected")?.dataset.val || "bucket";
+    if(dest==="project" && state.projects.length){
+      const pid = document.getElementById("capProjectSelect").value;
+      addProjectTask(pid, Capture.state.text);
+    } else {
+      addBucketItem({ personId:"buvan", title:Capture.state.text, timeline:"Someday" });
+    }
+    UI.closeSheet(); UI.render(); showToast("Saved");
+  }
+};
+function captureTitle(type){ return { memory:"What happened?", reminder:"What should I remind you about?", followup:"What do you need to follow up on?", person:"What would you like to save?", task:"What's the task?" }[type]; }
+
+/* =========================================================================
+   ONBOARDING
+   ========================================================================= */
+let onboardStep = 0;
+function renderOnboarding(){
+  const steps = ["welcome","theme","notifications","girlfriend","family","done"];
+  const key = steps[onboardStep];
+  const dots = steps.slice(0,-1).map((s,i)=>`<span class="${i<=onboardStep?'on':''}"></span>`).join("");
+  let body = "";
+  if(key==="welcome"){
+    body = `
+      <div class="onboard-mark">R</div>
+      <h1>Welcome to Remainder.</h1>
+      <div class="onboard-tagline">Your life. Remembered.<br><br>Remainder is your private second brain for people, memories, responsibilities, reminders, and future plans. Your data stays on this device.</div>
+      <button class="btn btn-primary btn-block" onclick="Onboard.next()">Get started</button>
+    `;
+  } else if(key==="theme"){
+    body = `
+      <h1 style="font-size:24px;">Pick a look</h1>
+      <div class="onboard-tagline">You can change this anytime in Settings.</div>
+      <div class="chip-row">
+        <button class="chip ${state.settings.theme==='light'?'selected':''}" onclick="Onboard.setTheme('light')">Light</button>
+        <button class="chip ${state.settings.theme==='dark'?'selected':''}" onclick="Onboard.setTheme('dark')">Dark</button>
+        <button class="chip ${state.settings.theme==='system'?'selected':''}" onclick="Onboard.setTheme('system')">System</button>
+      </div>
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary btn-block" onclick="Onboard.next()">Continue</button>
+    `;
+  } else if(key==="notifications"){
+    body = `
+      <h1 style="font-size:24px;">Enable Remainder Notifications</h1>
+      <div class="onboard-tagline">Notifications help Remainder remind you about important follow-ups, calls, appointments, and personal commitments.</div>
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary btn-block" onclick="Onboard.enableNotif()">Enable Notifications</button>
+      <button class="small-link" onclick="Onboard.next()">Not now</button>
+    `;
+  } else if(key==="girlfriend"){
+    body = `
+      <h1 style="font-size:24px;">Add a girlfriend profile?</h1>
+      <div class="onboard-tagline">Track meaningful details, memories, and important dates. You can always add this later.</div>
+      <label>Name</label><input type="text" id="obGfName" placeholder="Name">
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary btn-block" onclick="Onboard.saveGirlfriend()">Save and continue</button>
+      <button class="small-link" onclick="Onboard.next()">Skip</button>
+    `;
+  } else if(key==="family"){
+    body = `
+      <h1 style="font-size:24px;">Add a family member?</h1>
+      <div class="onboard-tagline">Start with someone you check in on often, like a parent.</div>
+      <label>Name</label><input type="text" id="obFamName" placeholder="e.g. Mom">
+      <label>Relationship</label><input type="text" id="obFamRel" placeholder="e.g. Mother">
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary btn-block" onclick="Onboard.saveFamily()">Save and continue</button>
+      <button class="small-link" onclick="Onboard.next()">Skip</button>
+    `;
+  } else {
+    body = `
+      <div class="onboard-mark">✓</div>
+      <h1 style="font-size:26px;">You're all set.</h1>
+      <div class="onboard-tagline">Remainder will help you remember the people, moments, and responsibilities that matter — and bring the right thing back to you at the right time.</div>
+      <div style="flex:1;"></div>
+      <button class="btn btn-primary btn-block" onclick="Onboard.finish()">Enter Remainder</button>
+    `;
+  }
+  return `<div class="onboard-wrap">
+    <div class="progress-dots">${dots}</div>
+    ${body}
+    ${key!=="welcome"&&key!=="done"?`<button class="small-link" style="align-self:center;" onclick="Onboard.skipAll()">Skip setup</button>`:''}
+  </div>`;
+}
+function attachOnboardingHandlers(){}
+const Onboard = {
+  next(){ onboardStep++; UI.render(); },
+  setTheme(t){ state.settings.theme=t; saveState(); resolveTheme(); UI.render(); },
+  enableNotif(){ requestNotifPermission(); setTimeout(Onboard.next,200); },
+  saveGirlfriend(){
+    const name = document.getElementById("obGfName").value.trim();
+    if(name) addPerson({ area:"girlfriend", name, relationship:"Girlfriend", preferences:{likes:[],dislikes:[],favFood:"",favColor:"",placesToVisit:[],thingsToBuy:[],importantDates:[]} });
+    Onboard.next();
+  },
+  saveFamily(){
+    const name = document.getElementById("obFamName").value.trim();
+    if(name) addPerson({ area:"family", name, relationship:document.getElementById("obFamRel").value.trim() });
+    Onboard.next();
+  },
+  skipAll(){ Onboard.finish(); },
+  finish(){ state.settings.onboarded = true; saveState(); UI.render(); }
+};
+
+/* =========================================================================
+   NAVIGATION helper exposure + generic handlers
+   ========================================================================= */
+function attachScreenHandlers(){ /* rendering is fully declarative via inline handlers */ }
+
+/* =========================================================================
+   INITIALIZATION
+   ========================================================================= */
+window.setTheme = setTheme;
+window.requestNotifPermission = requestNotifPermission;
+window.startVoice = startVoice;
+window.UI = UI;
+window.ItemActions = ItemActions;
+window.ReminderUI = ReminderUI;
+window.FollowUpUI = FollowUpUI;
+window.BucketUI = BucketUI;
+window.ProjectUI = ProjectUI;
+window.HealthUI = HealthUI;
+window.People = People;
+window.Capture = Capture;
+window.Onboard = Onboard;
+window.MoreUI = MoreUI;
+window.SearchUI = SearchUI;
+window.PeriodUI = PeriodUI;
+window.addDays = addDays;
+
+function init(){
+  state = loadState();
+  if(state.cycles && state.cycles.length) maybeCreatePmsTimelineNote();
+  resolveTheme();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", ()=>{ if(state.settings.theme==="system"){ resolveTheme(); } });
+  UI.render();
+  setInterval(checkDueReminders, 60000);
+  checkDueReminders();
+}
+document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
